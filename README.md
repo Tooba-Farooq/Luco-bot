@@ -30,8 +30,6 @@ FastAPI backend for the reception robot — handles visitor detection, face reco
    uvicorn app.main:app --reload
 ```
 
-5. Test via Swagger UI: `http://127.0.0.1:8000/docs`
-
 ## API: `/detect`
 
 **Method:** `POST`
@@ -57,7 +55,7 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
 | Status      | Meaning                                               | Suggested Unity behavior                           |
 | ----------- | ----------------------------------------------------- | -------------------------------------------------- |
 | `idle`      | No face detected / no one there                       | Idle animation, no audio                           |
-| `detecting` | Face detected, checking if forward-facing long enough | Optional subtle "noticing" animation, no audio yet |
+| `detecting` | Face detected, checking if forward-facing long enough |Idle animation                                      |
 | `known`     | Recognized visitor (3s+ forward-facing confirmed)     | Play greeting audio with `visitor_name`            |
 | `unknown`   | Unrecognized visitor (3s+ forward-facing confirmed)   | Play hardcoded "How may I help you?" audio         |
 
@@ -68,4 +66,4 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
 - Send a frame roughly every 500ms–1s while camera is active.
 - No need to hold state on the Unity side — backend tracks the forward-facing timer internally between calls.
 
-## Project structure
+
