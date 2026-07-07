@@ -42,3 +42,5 @@ venv/
 __pycache__/
 *.pyc
 *.pkl
+*.task
+*.tflite
