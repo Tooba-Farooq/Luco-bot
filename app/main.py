@@ -1,7 +1,5 @@
 from fastapi import FastAPI
+from app.routes import detection
 
-app = FastAPI(title="Reception Robot Backend")
-
-@app.get("/")
-def health_check():
-    return {"status": "ok"}
+app = FastAPI(title="Lucobot Backend")
+app.include_router(detection.router)
