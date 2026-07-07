@@ -1,42 +1,54 @@
-forward_start_time = None
-last_seen_forward_time = None
-GRACE_PERIOD_SECONDS = 1.5  # tune this — how long a "look away" is tolerated before reset
+from fastapi import APIRouter, UploadFile, File
+from app.models import DetectionResponse
+from app.services.detection_service import check_face_present, check_face_forward, run_face_recognition
+from app.services.detection_state import detection_state
+import time
+
+router = APIRouter()
+
+GRACE_PERIOD_SECONDS = 1.5  # how long a brief look-away is tolerated before resetting
+FORWARD_DURATION_THRESHOLD = 3.0
+
 
 @router.post("/detect", response_model=DetectionResponse)
 async def detect(frame: UploadFile = File(...)):
-    global forward_start_time, last_seen_forward_time
     image_bytes = await frame.read()
 
+    # STEP 1: cheap face detection check
     face_found, face_box = check_face_present(image_bytes)
     if not face_found:
-        forward_start_time = None
-        last_seen_forward_time = None
+        detection_state.reset()
         return DetectionResponse(status="idle")
 
+    # STEP 2: forward-facing + distance check
     is_forward = check_face_forward(image_bytes, face_box)
     now = time.time()
 
     if is_forward:
-        if forward_start_time is None:
-            forward_start_time = now
-        last_seen_forward_time = now
-        duration = now - forward_start_time
+        if detection_state.forward_start_time is None:
+            detection_state.forward_start_time = now
+        detection_state.last_seen_forward_time = now
+        duration = now - detection_state.forward_start_time
     else:
-        # not forward right now — but check if we're still within grace period
-        if last_seen_forward_time is not None and (now - last_seen_forward_time) < GRACE_PERIOD_SECONDS:
-            # still within grace window — don't reset, just don't accumulate new time either
-            duration = last_seen_forward_time - forward_start_time
+        within_grace = (
+            detection_state.last_seen_forward_time is not None
+            and (now - detection_state.last_seen_forward_time) < GRACE_PERIOD_SECONDS
+        )
+        if within_grace:
+            duration = detection_state.last_seen_forward_time - detection_state.forward_start_time
         else:
-            # genuinely looked away too long — reset
-            forward_start_time = None
-            last_seen_forward_time = None
+            detection_state.reset()
             duration = 0.0
 
-    if duration < 3.0:
+    if duration < FORWARD_DURATION_THRESHOLD:
         return DetectionResponse(status="detecting", face_forward=is_forward, forward_duration=duration)
 
+    # STEP 3: only now run face recognition (expensive)
     name, confidence = run_face_recognition(image_bytes)
     if name:
-        return DetectionResponse(status="known", visitor_name=name, confidence=confidence, face_forward=True, forward_duration=duration)
+        return DetectionResponse(
+            status="known", visitor_name=name, confidence=confidence,
+            face_forward=True, forward_duration=duration
+        )
     else:
         return DetectionResponse(status="unknown", face_forward=True, forward_duration=duration)

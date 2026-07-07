@@ -11,6 +11,7 @@ test_images = [
     r"C:\Users\tooba\Pictures\Camera Roll\WIN_20260707_10_06_18_Pro.jpg",
     r"C:\Users\tooba\Pictures\Camera Roll\WIN_20260707_10_06_24_Pro.jpg",
     r"C:\Users\tooba\Pictures\Camera Roll\WIN_20260707_10_06_28_Pro.jpg",
+    r"C:\Users\tooba\Pictures\Camera Roll\WIN_20260707_10_07_25_Pro.jpg",
     
 ]
 
