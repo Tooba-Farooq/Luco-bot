@@ -5,17 +5,18 @@ using System.Collections;
 public class DeviceCheck : MonoBehaviour
 {
     public FaceExpressionController face;
-    private WebCamTexture camTexture;
+    public WebCamTexture camTexture;
     private string micDevice;
 
     void Start()
     {
-        //Camera Permission
+        // Camera Permission
         if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
         {
             var cameraCallbacks = new PermissionCallbacks();
             cameraCallbacks.PermissionGranted += OnCameraPermissionGranted;
-            cameraCallbacks.PermissionDenied += (permissionName) => Debug.LogWarning("Camera permission denied.");
+            cameraCallbacks.PermissionDenied += (permissionName) =>
+                Debug.LogWarning("Camera permission denied.");
 
             Permission.RequestUserPermission(Permission.Camera, cameraCallbacks);
         }
@@ -29,7 +30,9 @@ public class DeviceCheck : MonoBehaviour
         {
             var micCallbacks = new PermissionCallbacks();
             micCallbacks.PermissionGranted += OnMicPermissionGranted;
-            micCallbacks.PermissionDenied += (permissionName) => Debug.LogWarning("Microphone permission denied.");
+            micCallbacks.PermissionDenied += (permissionName) =>
+                Debug.LogWarning("Microphone permission denied.");
+
             Permission.RequestUserPermission(Permission.Microphone, micCallbacks);
         }
         else
@@ -40,31 +43,78 @@ public class DeviceCheck : MonoBehaviour
 
     private void OnCameraPermissionGranted(string permissionName)
     {
-        Debug.Log("Camera permission granted by user callback.");
+        Debug.Log("Camera permission granted.");
         StartCamera();
     }
 
     private void OnMicPermissionGranted(string permissionName)
     {
-        Debug.Log("Microphone permission granted by user callback.");
+        Debug.Log("Microphone permission granted.");
         StartMicrophone();
     }
 
     private void StartCamera()
     {
-        if (WebCamTexture.devices.Length > 0)
-        {
-            camTexture = new WebCamTexture(WebCamTexture.devices[0].name);
-            camTexture.Play();
-            Debug.Log("Camera started: " + camTexture.isPlaying);
+        WebCamDevice[] devices = WebCamTexture.devices;
 
-            if (face != null)
-                face.SetExpression(FaceExpression.Happy);
+        if (devices.Length == 0)
+        {
+            Debug.LogWarning("No camera devices found.");
+            return;
+        }
+
+        // Log every camera
+        for (int i = 0; i < devices.Length; i++)
+        {
+            Debug.Log($"Camera {i}: {devices[i].name}, FrontFacing: {devices[i].isFrontFacing}");
+        }
+
+        // Default to first camera
+        string selectedCamera = devices[0].name;
+
+        // Prefer front camera
+        foreach (var device in devices)
+        {
+            if (device.isFrontFacing)
+            {
+                selectedCamera = device.name;
+                break;
+            }
+        }
+
+        Debug.Log("Using camera: " + selectedCamera);
+
+        camTexture = new WebCamTexture(selectedCamera);
+        camTexture.Play();
+
+        Debug.Log("Camera started: " + camTexture.isPlaying);
+
+        if (face != null)
+            face.SetExpression(FaceExpression.Happy);
+
+        FaceDetectionService detectionService = FindAnyObjectByType<FaceDetectionService>();
+
+        if (detectionService != null)
+        {
+            StartCoroutine(StartDetectionWhenCameraReady(detectionService));
         }
         else
         {
-            Debug.LogWarning("No camera devices found physically on the device.");
+            Debug.LogError("FaceDetectionService not found!");
         }
+    }
+
+    private IEnumerator StartDetectionWhenCameraReady(FaceDetectionService detectionService)
+    {
+        while (!camTexture.isPlaying || camTexture.width <= 16 || camTexture.height <= 16)
+        {
+            yield return null;
+        }
+
+        Debug.Log($"Camera ready: {camTexture.width} x {camTexture.height}");
+
+        detectionService.webcamTexture = camTexture;
+        detectionService.StartPolling();
     }
 
     private void StartMicrophone()
@@ -73,23 +123,25 @@ public class DeviceCheck : MonoBehaviour
         {
             micDevice = Microphone.devices[0];
             AudioClip clip = Microphone.Start(micDevice, true, 10, 44100);
+
             Debug.Log("Mic started: " + (clip != null));
 
             if (face != null)
             {
                 face.SetExpression(FaceExpression.Listening, autoReturnToIdle: false);
-                StartCoroutine(ReturnToIdleAfterDelay(5f)); // TEST ONLY — remove once real mic-stop logic exists
+                StartCoroutine(ReturnToIdleAfterDelay(5f));
             }
         }
         else
         {
-            Debug.LogWarning("No microphone devices found physically on the device.");
+            Debug.LogWarning("No microphone devices found.");
         }
     }
 
     private IEnumerator ReturnToIdleAfterDelay(float seconds)
     {
         yield return new WaitForSeconds(seconds);
+
         if (face != null)
             face.ReturnToIdle();
     }

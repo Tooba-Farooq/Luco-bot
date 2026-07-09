@@ -1,0 +1,24 @@
+public enum VisitorFlowState
+{
+    Idle,
+    DetectingPerson,
+    FaceRecognition,
+    GreetKnownVisitor,
+    CollectName,
+    ConfirmSpelling,
+    CapturePhoto,
+    AskPurpose,
+    IntentBranch,
+    GeneralQuery,
+    MeetSomeone_EnterHostName,
+    MeetSomeone_HostLookup,
+    MeetSomeone_ShowSimilarNames,
+    MeetSomeone_EnterPurpose,
+    AlertingHost,
+    WaitingHostResponse,
+    HostUnavailable,
+    HostAccepted,
+    VisitorWaiting,
+    RecordMessage,
+    VisitLogged
+}
