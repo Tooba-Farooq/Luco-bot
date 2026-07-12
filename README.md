@@ -15,4 +15,4 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 3. Look for **IPv4 Address** under your active WiFi adapter .
 4. This is the IP the Unity app needs to point to — update it in `FaceDetectionService`'s `Base Url` field, formatted as:
-http://<your-ip>:8000
+http://Your_IP:8000
