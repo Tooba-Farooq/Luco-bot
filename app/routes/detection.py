@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File
 from app.models import DetectionResponse
-from app.services.detection_service import check_face_present, check_face_forward, run_face_recognition
+from app.services.detection_service import check_face_present, check_face_forward, run_face_recognition, _load_image
 from app.services.detection_state import detection_state
 import time
 
@@ -13,15 +13,18 @@ FORWARD_DURATION_THRESHOLD = 3.0
 @router.post("/detect", response_model=DetectionResponse)
 async def detect(frame: UploadFile = File(...)):
     image_bytes = await frame.read()
+    image = _load_image(image_bytes)  # decode ONCE, here
 
-    # STEP 1: cheap face detection check
-    face_found, face_box = check_face_present(image_bytes)
+    if image is None:
+        detection_state.reset()
+        return DetectionResponse(status="idle")
+
+    face_found, face_box = check_face_present(image)
     if not face_found:
         detection_state.reset()
         return DetectionResponse(status="idle")
 
-    # STEP 2: forward-facing + distance check
-    is_forward = check_face_forward(image_bytes, face_box)
+    is_forward = check_face_forward(image, face_box)
     now = time.time()
 
     if is_forward:

@@ -21,21 +21,18 @@ landmarker_options = mp_vision.FaceLandmarkerOptions(
 face_landmarker = mp_vision.FaceLandmarker.create_from_options(landmarker_options)
 
 
-def _load_image(image_bytes_or_path):
-    """Shared helper: load image from either a file path or raw bytes."""
-    if isinstance(image_bytes_or_path, str):
-        return cv2.imread(image_bytes_or_path)
-    nparr = np.frombuffer(image_bytes_or_path, np.uint8)
-    return cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+# def _load_image(image_bytes_or_path):
+#     """Shared helper: load image from either a file path or raw bytes."""
+#     if isinstance(image_bytes_or_path, str):
+#         return cv2.imread(image_bytes_or_path)
+#     nparr = np.frombuffer(image_bytes_or_path, np.uint8)
+#     return cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
 
-def check_face_present(image_bytes_or_path):
+def check_face_present(image):
     """
     Returns (face_found: bool, face_box: (x, y, width, height) or None)
     """
-    image = _load_image(image_bytes_or_path)
-    if image is None:
-        return False, None
 
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
@@ -49,15 +46,12 @@ def check_face_present(image_bytes_or_path):
     return True, (bbox.origin_x, bbox.origin_y, bbox.width, bbox.height)
 
 
-def check_face_forward(image_bytes_or_path, face_box) -> bool:
+def check_face_forward(image, face_box, debug: bool = False) -> bool:
     """
     Returns True only if:
     1. Face is close enough (size gate — distance proxy for genuine intent)
     2. Face is facing the camera (yaw gate, via Face Landmarker)
     """
-    image = _load_image(image_bytes_or_path)
-    if image is None:
-        return False
 
     h, w, _ = image.shape
 
