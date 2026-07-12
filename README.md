@@ -30,8 +30,6 @@ FastAPI backend for the reception robot — handles visitor detection, face reco
    uvicorn app.main:app --reload
 ```
 
-5. Test via Swagger UI: `http://127.0.0.1:8000/docs`
-
 ## API: `/detect`
 
 **Method:** `POST`
@@ -54,12 +52,12 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
 
 ### Status meanings — what Unity should do for each
 
-| Status      | Meaning                                               | Suggested Unity behavior                           |
-| ----------- | ----------------------------------------------------- | -------------------------------------------------- |
-| `idle`      | No face detected / no one there                       | Idle animation, no audio                           |
-| `detecting` | Face detected, checking if forward-facing long enough | Optional subtle "noticing" animation, no audio yet |
-| `known`     | Recognized visitor (3s+ forward-facing confirmed)     | Play greeting audio with `visitor_name`            |
-| `unknown`   | Unrecognized visitor (3s+ forward-facing confirmed)   | Play hardcoded "How may I help you?" audio         |
+| Status      | Meaning                                               | Suggested Unity behavior                   |
+| ----------- | ----------------------------------------------------- | ------------------------------------------ |
+| `idle`      | No face detected / no one there                       | Idle animation, no audio                   |
+| `detecting` | Face detected, checking if forward-facing long enough | Idle animation                             |
+| `known`     | Recognized visitor (3s+ forward-facing confirmed)     | Play greeting audio with `visitor_name`    |
+| `unknown`   | Unrecognized visitor (3s+ forward-facing confirmed)   | Play hardcoded "How may I help you?" audio |
 
 **For now**, since face recognition isn't wired up yet, `status` will only ever be `idle`, `detecting`, or `unknown` — never `known`. Treat `unknown` as your trigger to play the hardcoded greeting audio. This will start correctly returning `known` (with real names) once recognition is completed — the response shape won't change, so no rework needed on your end later.
 
