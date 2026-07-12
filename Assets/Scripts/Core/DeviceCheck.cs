@@ -89,9 +89,6 @@ public class DeviceCheck : MonoBehaviour
 
         Debug.Log("Camera started: " + camTexture.isPlaying);
 
-        if (face != null)
-            face.SetExpression(FaceExpression.Happy);
-
         FaceDetectionService detectionService = FindAnyObjectByType<FaceDetectionService>();
 
         if (detectionService != null)
@@ -125,12 +122,6 @@ public class DeviceCheck : MonoBehaviour
             AudioClip clip = Microphone.Start(micDevice, true, 10, 44100);
 
             Debug.Log("Mic started: " + (clip != null));
-
-            if (face != null)
-            {
-                face.SetExpression(FaceExpression.Listening, autoReturnToIdle: false);
-                StartCoroutine(ReturnToIdleAfterDelay(5f));
-            }
         }
         else
         {

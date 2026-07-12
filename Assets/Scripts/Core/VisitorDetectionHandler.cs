@@ -5,8 +5,9 @@ public class VisitorDetectionHandler : MonoBehaviour
     public FaceDetectionService detectionService;
     public FaceExpressionController face;
     public AudioClip unknownGreetingClip; // hardcoded "How may I help you?" audio
-
+    public VisitorFlowManager flowManager;
     private string lastStatus = "";
+
 
     void OnEnable()
     {
@@ -24,7 +25,15 @@ public class VisitorDetectionHandler : MonoBehaviour
 
         if (result.status == lastStatus) return;
         lastStatus = result.status;
-
+        bool flowIsIdle = flowManager.CurrentState == VisitorFlowState.Idle
+                        || flowManager.CurrentState == VisitorFlowState.DetectingPerson;
+        
+         if (!flowIsIdle)
+        {
+            // Ignore — visitor is already in the middle of a conversation
+            return;
+        }
+        
         switch (result.status)
         {
             case "idle":
@@ -38,6 +47,7 @@ public class VisitorDetectionHandler : MonoBehaviour
             case "unknown":
                 face.SetExpression(FaceExpression.Happy); // greeting reaction
                 face.StartTalking(unknownGreetingClip);   // hardcoded "How may I help you?" for now
+                flowManager.GoTo(VisitorFlowState.CollectName);
                 break;
 
             case "known":

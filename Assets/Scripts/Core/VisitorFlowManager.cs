@@ -59,4 +59,13 @@ public class VisitorFlowManager : MonoBehaviour
                 break;
         }
     }
+
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Space)) GoTo(VisitorFlowState.CollectName);
+        if (Input.GetKeyDown(KeyCode.H)) GoTo(VisitorFlowState.GreetKnownVisitor);
+        if (Input.GetKeyDown(KeyCode.U)) GoTo(VisitorFlowState.HostUnavailable);
+        if (Input.GetKeyDown(KeyCode.L)) GoTo(VisitorFlowState.VisitLogged);
+        if (Input.GetKeyDown(KeyCode.P)) GoTo(VisitorFlowState.MeetSomeone_EnterPurpose);
+    }
 }
