@@ -35,8 +35,3 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - **Voice input** (all screens): currently shows "Listening..." then falls back to typing after 2 seconds — needs a `/transcribe` (or similar) speech-to-text endpoint
 - **Host lookup / similar-names screens**: not built yet — needs a real host-directory API to look up against
 - **Real host-notification logic**: `WaitingHostResponse` screen is fully built but currently always times out to "no response" — needs a real backend system to notify hosts and receive accept/unavailable/no-response back
-
----
-
-## Repo
-Only push: `Assets`, `Packages`, `ProjectSettings`, `.gitignore`, `.gitattributes`, `.vsconfig` — standard Unity `.gitignore` handles excluding `Library/`, `Temp/`, build outputs, etc.
