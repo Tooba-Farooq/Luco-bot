@@ -15,7 +15,7 @@ public class DetectResponse
 public class FaceDetectionService : MonoBehaviour
 {
     [Header("Backend")]
-    public string baseUrl = "http://192.168.100.141:8000"; // replace with YOUR PC's IP from ipconfig
+    public string baseUrl = "http://YourIP:8000"; // replace with YOUR PC's IP from ipconfig
 
     [Header("References")]
     public WebCamTexture webcamTexture;
