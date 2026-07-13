@@ -55,16 +55,15 @@ async def detect(frame: UploadFile = File(...), db: Session = Depends(get_db)):
     session_id = detection_state.start_session()
 
     if status == "known":
-        audio_base64, greeting_text = await generate_known_greeting_audio(name)
+        audio_base64 = await generate_known_greeting_audio(name)
         return DetectionResponse(
             status=status, session_id=session_id, visitor_name=name, confidence=confidence,
             face_forward=True, forward_duration=duration,
-            greeting_text=greeting_text, audio_base64=audio_base64
+            audio_base64=audio_base64
         )
     else:
         return DetectionResponse(
             status=status, session_id=session_id,
             face_forward=True, forward_duration=duration,
-            greeting_text="Hi! I don't think we've met — what's your name?",
             audio_key="unknown_greeting"  # Unity fetches GET /audio/unknown_greeting
         )

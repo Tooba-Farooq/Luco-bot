@@ -48,7 +48,6 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
   "visitor_name": "Ahmed" | null,
   "confidence": 0.87 | null,
   "session_id": "abc123" | null,
-  "greeting_text": "Hi Ahmed, how may I help you today?" | null,
   "audio_base64": "<base64 mp3>" | null,
   "audio_key": "unknown_greeting" | null
 }
@@ -68,10 +67,6 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
 `known` and `unknown` are terminal states for this endpoint — they mean a person has been identified (or confirmed unidentifiable) and the interaction is moving into the greeting/name-capture flow. **Unity should stop calling `/detect` at this point** and move to whatever endpoint handles the next step (name capture, intent, etc. — not yet built). Continuing to poll `/detect` after this point will keep re-running detection and recognition unnecessarily and is not part of the intended flow.
 
 Polling should only resume once the current visitor's interaction is fully done and the tablet returns to idle (e.g. after `VISIT_LOGGED` or a QR handoff).
-
-### `greeting_text`
-
-Text of the greeting, for display/subtitle purposes. Audio for this text is delivered via one of two fields below — Unity should play the audio, not generate its own TTS from this text.
 
 ### `session_id`
 

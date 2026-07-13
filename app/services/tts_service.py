@@ -30,7 +30,7 @@ def get_static_audio_bytes(key: str) -> bytes:
         return f.read()
 
 
-async def generate_known_greeting_audio(visitor_name: str, lang: str = "en") -> tuple[str, str]:
+async def generate_known_greeting_audio(visitor_name: str, lang: str = "en") -> str:
     """
     Dynamic greeting — contains the visitor's real name, so it's generated
     live per-request, not cached. Returns (audio_base64, greeting_text).
@@ -45,4 +45,4 @@ async def generate_known_greeting_audio(visitor_name: str, lang: str = "en") -> 
             audio_bytes += chunk["data"]
 
     audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
-    return audio_base64, greeting_text
+    return audio_base64
