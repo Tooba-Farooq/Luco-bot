@@ -4,6 +4,7 @@ from app.database import get_db
 from app.models import DetectionResponse
 from app.services.detection_service import check_face_present, check_face_forward, run_face_recognition, _load_image
 from app.services.detection_state import detection_state
+from app.services.tts_service import generate_known_greeting_audio
 import time
 
 router = APIRouter()
@@ -50,10 +51,20 @@ async def detect(frame: UploadFile = File(...), db: Session = Depends(get_db)):
 
     # STEP 3: only now run face recognition (expensive) — pass decoded image + db
     name, confidence = run_face_recognition(image, db)
-    if name:
+    status = "known" if name else "unknown"
+    session_id = detection_state.start_session()
+
+    if status == "known":
+        audio_base64, greeting_text = await generate_known_greeting_audio(name)
         return DetectionResponse(
-            status="known", visitor_name=name, confidence=confidence,
-            face_forward=True, forward_duration=duration
+            status=status, session_id=session_id, visitor_name=name, confidence=confidence,
+            face_forward=True, forward_duration=duration,
+            greeting_text=greeting_text, audio_base64=audio_base64
         )
     else:
-        return DetectionResponse(status="unknown", face_forward=True, forward_duration=duration)
+        return DetectionResponse(
+            status=status, session_id=session_id,
+            face_forward=True, forward_duration=duration,
+            greeting_text="Hi! I don't think we've met — what's your name?",
+            audio_key="unknown_greeting"  # Unity fetches GET /audio/unknown_greeting
+        )

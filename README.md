@@ -47,18 +47,21 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
   "forward_duration": 0.0,
   "visitor_name": "Ahmed" | null,
   "confidence": 0.87 | null,
-  "greeting_text": "Hi Ahmed, how may I help you today?" | null
+  "session_id": "abc123" | null,
+  "greeting_text": "Hi Ahmed, how may I help you today?" | null,
+  "audio_base64": "<base64 mp3>" | null,
+  "audio_key": "unknown_greeting" | null
 }
 ```
 
 ### Status meanings — what Unity should do for each
 
-| Status      | Meaning                                               | Suggested Unity behavior                                  |
-| ----------- | ----------------------------------------------------- | --------------------------------------------------------- |
-| `idle`      | No face detected / no one there                       | Idle animation, no audio, keep polling                    |
-| `detecting` | Face detected, checking if forward-facing long enough | Idle animation, keep polling                              |
-| `known`     | Recognized visitor (3s+ forward-facing confirmed)     | Display/speak `greeting_text`, **stop polling `/detect`** |
-| `unknown`   | Unrecognized visitor (3s+ forward-facing confirmed)   | Display/speak `greeting_text`, **stop polling `/detect`** |
+| Status      | Meaning                                               | Suggested Unity behavior                                              |
+| ----------- | ----------------------------------------------------- | --------------------------------------------------------------------- |
+| `idle`      | No face detected / no one there                       | Idle animation, no audio, keep polling                                |
+| `detecting` | Face detected, checking if forward-facing long enough | Idle animation, keep polling                                          |
+| `known`     | Recognized visitor (3s+ forward-facing confirmed)     | Play greeting audio (`audio_base64`), **stop polling `/detect`**      |
+| `unknown`   | Unrecognized visitor (3s+ forward-facing confirmed)   | Fetch + play greeting audio (`audio_key`), **stop polling `/detect`** |
 
 ### ⚠️ Stop polling once `known` or `unknown` fires
 
@@ -68,7 +71,30 @@ Polling should only resume once the current visitor's interaction is fully done 
 
 ### `greeting_text`
 
-Display it on fronend for now later text to speech will be wired up and audio will be sent
+Text of the greeting, for display/subtitle purposes. Audio for this text is delivered via one of two fields below — Unity should play the audio, not generate its own TTS from this text.
+
+### `session_id`
+
+Present once status is `known` or `unknown`. Use this to guard against re-triggering the greeting if `/detect` is somehow called again before Unity has moved off this state — the same `session_id` should only produce one greeting playback.
+
+### Greeting audio: two delivery paths
+
+There are two different mechanisms depending on whether the greeting is a fixed phrase or contains visitor-specific data:
+
+| Field          | When present      | What it is                                                                       | How to use it                                                            |
+| -------------- | ----------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `audio_base64` | `status: known`   | Base64-encoded MP3 bytes, inline in the response                                 | Decode and play directly — no extra request needed                       |
+| `audio_key`    | `status: unknown` | A key identifying a **static, pre-generated** phrase (e.g. `"unknown_greeting"`) | Fetch the actual audio from `GET /audio/{key}` (see below), then play it |
+
+**Why the split:** the "unknown visitor" greeting is the same fixed sentence every time, so it's generated once at server startup and served as a static file — this avoids re-running TTS generation on every visitor. The "known visitor" greeting contains the visitor's name, so it's different every time and can't be pre-cached — it's generated live and sent inline instead of requiring a second round-trip.
+
+### API: `GET /audio/{key}`
+
+Returns raw `audio/mpeg` bytes for a static, pre-cached greeting phrase (e.g. `GET /audio/unknown_greeting`).
+
+**⚠️ Unity should cache this file locally after the first fetch.** The backend serves the same bytes for a given `key` every time — nothing about it changes between requests. Fetching it fresh on every `unknown` detection wastes bandwidth and adds unnecessary latency. Recommended approach: fetch once, store the resulting `AudioClip` in memory (or on disk) keyed by `audio_key`, and reuse it for all future `unknown` greetings without hitting this endpoint again. The response includes `Cache-Control` headers to support this if your HTTP client respects them.
+
+Returns `404` if the key doesn't match a known cached phrase.
 
 ### Polling guidance
 
