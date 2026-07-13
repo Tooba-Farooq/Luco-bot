@@ -91,6 +91,8 @@ Returns raw `audio/mpeg` bytes for a static, pre-cached greeting phrase (e.g. `G
 
 Returns `404` if the key doesn't match a known cached phrase.
 
+Cache-Control is set to `public, max-age=31536000, immutable` — safe because each `audio_key` maps to a fixed phrase that never changes at runtime. If you ever edit a static phrase's wording in `tts_service.py`, use a new key (e.g. `unknown_greeting_v2`) rather than reusing the old one, since aggressively-cached clients won't know to drop stale copies otherwise.
+
 ### Polling guidance
 
 - Send a frame roughly every 500ms–1s while camera is active and status is `idle` or `detecting`.

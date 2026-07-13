@@ -6,7 +6,7 @@ STATIC_AUDIO_DIR = "static_audio_cache"
 os.makedirs(STATIC_AUDIO_DIR, exist_ok=True)
 
 VOICE_EN = "en-US-AriaNeural"
-VOICE_UR = "ur-PK-UzmaNeural"
+VOICE_UR = "hi-IN-MadhurNeural"
 
 # Fixed phrases — no visitor-specific data, generated once and cached forever
 STATIC_PHRASES = {

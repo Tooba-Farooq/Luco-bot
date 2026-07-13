@@ -9,6 +9,10 @@ router = APIRouter()
 def get_audio(key: str):
     try:
         audio_bytes = get_static_audio_bytes(key)
-        return Response(content=audio_bytes, media_type="audio/mpeg")
+        return Response(
+            content=audio_bytes,
+            media_type="audio/mpeg",
+            headers={"Cache-Control": "public, max-age=31536000, immutable"}
+        )
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Audio not found")
