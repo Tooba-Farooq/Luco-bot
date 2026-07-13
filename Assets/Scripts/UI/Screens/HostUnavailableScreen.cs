@@ -41,5 +41,6 @@ public class HostUnavailableScreen : MonoBehaviour
     {
         Debug.Log("Visitor cancelled the visit.");
         flowManager.GoTo(VisitorFlowState.Idle);
+        FindAnyObjectByType<FaceDetectionService>()?.StartPolling();
     }
 }
