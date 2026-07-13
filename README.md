@@ -36,7 +36,7 @@ FastAPI backend for the reception robot — handles visitor detection, face reco
 **Content-Type:** `multipart/form-data`
 **Field name:** `frame` (image file — JPEG/PNG)
 
-Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) while the tablet is active — each call is independent, backend tracks state internally between calls.
+Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) while the tablet is in idle/detecting state — each call is independent, backend tracks state internally between calls.
 
 ### Response shape
 
@@ -46,25 +46,35 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
   "face_forward": true | false,
   "forward_duration": 0.0,
   "visitor_name": "Ahmed" | null,
-  "confidence": 0.87 | null
+  "confidence": 0.87 | null,
+  "greeting_text": "Hi Ahmed, how may I help you today?" | null
 }
 ```
 
 ### Status meanings — what Unity should do for each
 
-| Status      | Meaning                                               | Suggested Unity behavior                   |
-| ----------- | ----------------------------------------------------- | ------------------------------------------ |
-| `idle`      | No face detected / no one there                       | Idle animation, no audio                   |
-| `detecting` | Face detected, checking if forward-facing long enough | Idle animation                             |
-| `known`     | Recognized visitor (3s+ forward-facing confirmed)     | Play greeting audio with `visitor_name`    |
-| `unknown`   | Unrecognized visitor (3s+ forward-facing confirmed)   | Play hardcoded "How may I help you?" audio |
+| Status      | Meaning                                               | Suggested Unity behavior                                  |
+| ----------- | ----------------------------------------------------- | --------------------------------------------------------- |
+| `idle`      | No face detected / no one there                       | Idle animation, no audio, keep polling                    |
+| `detecting` | Face detected, checking if forward-facing long enough | Idle animation, keep polling                              |
+| `known`     | Recognized visitor (3s+ forward-facing confirmed)     | Display/speak `greeting_text`, **stop polling `/detect`** |
+| `unknown`   | Unrecognized visitor (3s+ forward-facing confirmed)   | Display/speak `greeting_text`, **stop polling `/detect`** |
 
-**For now**, since face recognition isn't wired up yet, `status` will only ever be `idle`, `detecting`, or `unknown` — never `known`. Treat `unknown` as your trigger to play the hardcoded greeting audio. This will start correctly returning `known` (with real names) once recognition is completed — the response shape won't change, so no rework needed on your end later.
+### ⚠️ Stop polling once `known` or `unknown` fires
+
+`known` and `unknown` are terminal states for this endpoint — they mean a person has been identified (or confirmed unidentifiable) and the interaction is moving into the greeting/name-capture flow. **Unity should stop calling `/detect` at this point** and move to whatever endpoint handles the next step (name capture, intent, etc. — not yet built). Continuing to poll `/detect` after this point will keep re-running detection and recognition unnecessarily and is not part of the intended flow.
+
+Polling should only resume once the current visitor's interaction is fully done and the tablet returns to idle (e.g. after `VISIT_LOGGED` or a QR handoff).
+
+### `greeting_text`
+
+Display it on fronend for now later text to speech will be wired up and audio will be sent
 
 ### Polling guidance
 
-- Send a frame roughly every 500ms–1s while camera is active.
+- Send a frame roughly every 500ms–1s while camera is active and status is `idle` or `detecting`.
 - No need to hold state on the Unity side — backend tracks the forward-facing timer internally between calls.
+- Stop polling once `known` or `unknown` is received (see above).
 
 ## API: `/employees`
 
@@ -111,3 +121,38 @@ The employee record is **always created**, even if a face embedding could not be
 ### Why this design
 
 Face recognition is treated as a bonus capability layered on top of a valid employee record, not a requirement for one — this keeps the system consistent with how it already handles unrecognized visitors elsewhere (gracefully falls back to manual identification rather than hard-failing).
+
+## Troubleshooting
+
+### `AttributeError: module 'cv2' has no attribute 'CascadeClassifier'`
+
+This means a broken/incompatible opencv version got installed (seen with `opencv-python==5.0.0.93`, which is not a stable release). `requirements.txt` pins a known-good version, but if you hit this anyway (e.g. after a manual install or version bump), fix it with:
+
+```bash
+pip uninstall opencv-python opencv-python-headless opencv-contrib-python opencv-contrib-python-headless -y
+pip install opencv-contrib-python==4.10.0.84
+```
+
+Only one opencv package should be installed at a time — having more than one installed simultaneously can cause partial/broken imports. Verify with:
+
+```bash
+pip list | findstr opencv    # Windows
+pip list | grep opencv       # Mac/Linux
+```
+
+Should show exactly one line: `opencv-contrib-python 4.10.0.84`.
+
+### `haarcascade_frontalface_default.xml` not found / opencv detector fails to load
+
+Confirm the cascade file path resolves correctly:
+
+```python
+import cv2
+print(cv2.data.haarcascades)
+```
+
+If this errors or points to an empty/missing folder, reinstalling opencv-contrib-python per the fix above should resolve it — the cascade files ship bundled with the package. If the folder exists but the specific file is missing, download it directly and place it in that exact folder:
+
+```bash
+curl -o haarcascade_frontalface_default.xml https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml
+```

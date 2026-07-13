@@ -22,6 +22,19 @@ dist/
 *.sqlite3
 *.sqlite
 
+# Uploaded employee/visitor photos (contains real personal data — never commit)
+employee_photos/
+visitor_photos/
+
+# ML model files (large binaries — downloaded via setup steps in README, not committed)
+*.task
+*.tflite
+*.onnx
+*.caffemodel
+*.prototxt
+*.pkl
+models/
+
 # Audio test files (can get large, regenerate anytime)
 test_data/*.mp3
 test_data/*.wav
@@ -38,10 +51,3 @@ Thumbs.db
 
 # Logs
 *.log
-
-venv/
-__pycache__/
-*.pyc
-*.pkl
-*.task
-*.tflite

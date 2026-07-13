@@ -5,6 +5,10 @@ from mediapipe.tasks.python import vision
 from mediapipe.tasks.python import vision as mp_vision
 import numpy as np
 import math
+from deepface import DeepFace
+from sqlalchemy.orm import Session
+from app.models_db import Employee, Visitor
+
 
 # --- Face presence detector (cheap, runs every frame) ---
 base_options = python.BaseOptions(model_asset_path='blaze_face_short_range.tflite')
@@ -20,13 +24,18 @@ landmarker_options = mp_vision.FaceLandmarkerOptions(
 )
 face_landmarker = mp_vision.FaceLandmarker.create_from_options(landmarker_options)
 
+# --- Recognition config (validated: ArcFace + opencv, see benchmark results) ---
+FACE_RECOGNITION_MODEL = "ArcFace"
+FACE_DETECTOR_BACKEND = "opencv"
+RECOGNITION_THRESHOLD = 0.68  # from your own testing — true matches sat well under this
 
-# def _load_image(image_bytes_or_path):
-#     """Shared helper: load image from either a file path or raw bytes."""
-#     if isinstance(image_bytes_or_path, str):
-#         return cv2.imread(image_bytes_or_path)
-#     nparr = np.frombuffer(image_bytes_or_path, np.uint8)
-#     return cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+def _load_image(image_bytes_or_path):
+    """Shared helper: load image from either a file path or raw bytes."""
+    if isinstance(image_bytes_or_path, str):
+        return cv2.imread(image_bytes_or_path)
+    nparr = np.frombuffer(image_bytes_or_path, np.uint8)
+    return cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
 
 def check_face_present(image):
@@ -79,9 +88,54 @@ def check_face_forward(image, face_box, debug: bool = False) -> bool:
     return abs(yaw_deg) < MAX_YAW_DEGREES
 
 
-def run_face_recognition(image_bytes_or_path):
+def _cosine_distance(emb1, emb2):
+    a, b = np.array(emb1), np.array(emb2)
+    return 1 - (np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+
+def run_face_recognition(image, db: Session):
     """
-    NOT BUILT YET — placeholder until face recognition is integrated.
-    Returns (None, None) so status resolves to "unknown" for now.
+    image: decoded numpy array (BGR), already confirmed forward-facing by the poll loop.
+    Generates one embedding for the incoming frame (ArcFace + opencv), then compares
+    it against every stored embedding (employees + known visitors) via cosine distance.
+
+    Returns (name: str | None, confidence: float | None).
+    Returns (None, None) if:
+      - opencv couldn't detect/crop a face in this frame (e.g. niqab, mask, bad angle
+        at the exact recognition instant) — treated as unknown, not an error
+      - no stored embedding is within threshold
     """
+    try:
+        result = DeepFace.represent(
+            img_path=image,
+            model_name=FACE_RECOGNITION_MODEL,
+            detector_backend=FACE_DETECTOR_BACKEND,
+            enforce_detection=True
+        )
+        incoming_embedding = result[0]["embedding"]
+    except ValueError:
+        # opencv couldn't find a face this pass — graceful fallback, not a crash
+        return None, None
+    except Exception as e:
+        print(f"Recognition embedding failed unexpectedly: {e}")
+        return None, None
+
+    best_match_name = None
+    best_dist = float("inf")
+
+    known_people = (
+        db.query(Employee).filter(Employee.face_embedding.isnot(None)).all()
+        + db.query(Visitor).filter(Visitor.face_embedding.isnot(None)).all()
+    )
+
+    for person in known_people:
+        dist = _cosine_distance(incoming_embedding, person.face_embedding)
+        if dist < best_dist:
+            best_dist = dist
+            best_match_name = person.name
+
+    if best_match_name and best_dist < RECOGNITION_THRESHOLD:
+        confidence = 1 - best_dist
+        return best_match_name, confidence
+
     return None, None

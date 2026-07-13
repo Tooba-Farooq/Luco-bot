@@ -37,13 +37,19 @@ while True:
                     API_URL,
                     files={"frame": ("frame.jpg", image_bytes, "image/jpeg")}
                 )
-                data = response.json()
-                status_text = (
-                    f"status={data['status']} "
-                    f"forward={data['face_forward']} "
-                    f"duration={data['forward_duration']:.1f}s"
-                )
-                print(status_text)
+                if response.status_code != 200:
+                    status_text = f"Backend error {response.status_code}: {response.text[:200]}"
+                    print(status_text)
+                else:
+                    data = response.json()
+                    status_text = (
+                        f"status={data['status']} "
+                        f"forward={data['face_forward']} "
+                        f"duration={data['forward_duration']:.1f}s"
+                    )
+                    if data.get("visitor_name"):
+                        status_text += f" name={data['visitor_name']} conf={data.get('confidence', 0):.2f}"
+                    print(status_text)
             except Exception as e:
                 status_text = f"Error: {e}"
                 print(status_text)

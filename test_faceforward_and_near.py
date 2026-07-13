@@ -1,15 +1,10 @@
 import cv2
 
-YUNET_MODEL_PATH = "models/face_detection_yunet_2023mar.onnx"
+PROTOTXT_PATH = "models/deploy.prototxt"
+MODEL_PATH = "models/res10_300x300_ssd_iter_140000.caffemodel"
+CONFIDENCE_THRESHOLD = 0.5
 
-face_detector = cv2.FaceDetectorYN.create(
-    model=YUNET_MODEL_PATH,
-    config="",
-    input_size=(320, 320),
-    score_threshold=0.7,
-    nms_threshold=0.3,
-    top_k=5000
-)
+net = cv2.dnn.readNetFromCaffe(PROTOTXT_PATH, MODEL_PATH)
 
 
 def check_face_present(image_path):
@@ -18,18 +13,28 @@ def check_face_present(image_path):
         return False, None
 
     h, w = image.shape[:2]
-    face_detector.setInputSize((w, h))
+    blob = cv2.dnn.blobFromImage(
+        cv2.resize(image, (300, 300)), 1.0, (300, 300), (104.0, 117.0, 123.0)
+    )
+    net.setInput(blob)
+    detections = net.forward()
 
-    _, faces = face_detector.detect(image)
-    if faces is None or len(faces) == 0:
+    best_conf = 0
+    best_box = None
+    for i in range(detections.shape[2]):
+        confidence = detections[0, 0, i, 2]
+        if confidence > CONFIDENCE_THRESHOLD and confidence > best_conf:
+            box = detections[0, 0, i, 3:7] * [w, h, w, h]
+            x, y, x1, y1 = box.astype("int")
+            best_conf = confidence
+            best_box = (int(x), int(y), int(x1 - x), int(y1 - y))
+
+    if best_box is None:
         return False, None
-
-    x, y, fw, fh = faces[0][:4]
-    return True, (int(x), int(y), int(fw), int(fh))
+    return True, best_box
 
 
 def show_with_box(image_path, box):
-    """Draws the detected box and displays it. Closes on any keypress."""
     image = cv2.imread(image_path)
     if image is None or box is None:
         return

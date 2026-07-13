@@ -23,7 +23,8 @@ MODELS_TO_TEST = [
     # ("ArcFace", "opencv"),
     # ("GhostFaceNet", "opencv"),
     # ("ArcFace", "yunet"),
-    ("ArcFace", "mediapipe"),
+    # ("ArcFace", "mediapipe"),
+    ("ArcFace", "ssd"),
 ]
 
 

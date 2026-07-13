@@ -1,4 +1,6 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Depends
+from sqlalchemy.orm import Session
+from app.database import get_db
 from app.models import DetectionResponse
 from app.services.detection_service import check_face_present, check_face_forward, run_face_recognition, _load_image
 from app.services.detection_state import detection_state
@@ -11,7 +13,7 @@ FORWARD_DURATION_THRESHOLD = 3.0
 
 
 @router.post("/detect", response_model=DetectionResponse)
-async def detect(frame: UploadFile = File(...)):
+async def detect(frame: UploadFile = File(...), db: Session = Depends(get_db)):
     image_bytes = await frame.read()
     image = _load_image(image_bytes)  # decode ONCE, here
 
@@ -46,8 +48,8 @@ async def detect(frame: UploadFile = File(...)):
     if duration < FORWARD_DURATION_THRESHOLD:
         return DetectionResponse(status="detecting", face_forward=is_forward, forward_duration=duration)
 
-    # STEP 3: only now run face recognition (expensive)
-    name, confidence = run_face_recognition(image_bytes)
+    # STEP 3: only now run face recognition (expensive) — pass decoded image + db
+    name, confidence = run_face_recognition(image, db)
     if name:
         return DetectionResponse(
             status="known", visitor_name=name, confidence=confidence,
