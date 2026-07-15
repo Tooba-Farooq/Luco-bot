@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
+using TMPro; // Added for TextMeshPro support. If using legacy Text, use UnityEngine.UI instead.
 
 public class VisitorDetectionHandler : MonoBehaviour
 {
@@ -9,6 +10,12 @@ public class VisitorDetectionHandler : MonoBehaviour
     public FaceExpressionController face;
     public VisitorFlowManager flowManager;
 
+    [Header("UI Reference")]
+    // Drag your TextMeshPro UGUI component here in the Unity Inspector
+    [SerializeField] private TextMeshProUGUI debugStatusText; 
+
+    [Header("Testing Controls")]
+    [SerializeField] private float testReturnDelay = 5f;
     private string lastStatus = "";
     private string lastSessionId = "";
     private Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
@@ -39,10 +46,12 @@ public class VisitorDetectionHandler : MonoBehaviour
         {
             case "idle":
                 face.ReturnToIdle();
+                UpdateStatusText("System: Idle");
                 flowManager.GoTo(VisitorFlowState.Idle);
                 break;
 
             case "detecting":
+                UpdateStatusText("Status: Detecting Person...");
                 flowManager.GoTo(VisitorFlowState.DetectingPerson);
                 break;
 
@@ -52,8 +61,12 @@ public class VisitorDetectionHandler : MonoBehaviour
 
                 detectionService.StopPolling();
                 face.SetExpression(FaceExpression.Happy);
+                
+                UpdateStatusText("Status: Processing Unknown Visitor");
+                
                 StartCoroutine(PlayCachedOrFetchAudio(result.audio_key));
-                flowManager.GoTo(VisitorFlowState.CollectName);
+                //flowManager.GoTo(VisitorFlowState.CollectName);
+                StartCoroutine(ReturnToIdleAfterDelay(testReturnDelay));
                 break;
 
             case "known":
@@ -62,6 +75,9 @@ public class VisitorDetectionHandler : MonoBehaviour
 
                 detectionService.StopPolling();
                 face.SetExpression(FaceExpression.Happy);
+                
+                UpdateStatusText($"Status: Greeted Known ({result.visitor_name})");
+                
                 PlayBase64Audio(result.audio_base64);
 
                 if (flowManager.Session != null)
@@ -70,10 +86,11 @@ public class VisitorDetectionHandler : MonoBehaviour
                 }
 
                 flowManager.GoTo(VisitorFlowState.GreetKnownVisitor);
-                StartCoroutine(AdvanceToAskPurposeAfterGreeting());
+                //StartCoroutine(AdvanceToAskPurposeAfterGreeting());
+                StartCoroutine(ReturnToIdleAfterDelay(testReturnDelay));
                 break;
         }
-    } // <-- THIS was missing — closes HandleResult()
+    } 
 
     // ---------- KNOWN: inline base64 audio ----------
 
@@ -142,5 +159,32 @@ public class VisitorDetectionHandler : MonoBehaviour
                 Debug.LogWarning("Failed to fetch audio for key '" + key + "': " + www.error);
             }
         }
+    }
+
+    // ---------- Helper to Update UI safely ----------
+    private void UpdateStatusText(string text)
+    {
+        if (debugStatusText != null)
+        {
+            debugStatusText.text = text;
+        }
+    }
+
+    //BacktoIdle
+    private IEnumerator ReturnToIdleAfterDelay(float delay)
+    {
+        // Visual indicator that it's waiting to reset
+        UpdateStatusText($"Returning to Idle in {delay:F1}s...");
+        
+        yield return new WaitForSeconds(delay);
+        
+        Debug.Log($"[Test] Returning to Idle state after {delay} seconds.");
+        face.ReturnToIdle();
+        
+        // This is the moment it transitions back:
+        UpdateStatusText("System: Idle");
+        
+        detectionService.StartPolling();
+        flowManager.GoTo(VisitorFlowState.Idle);
     }
 }
