@@ -65,5 +65,5 @@ async def detect(frame: UploadFile = File(...), db: Session = Depends(get_db)):
         return DetectionResponse(
             status=status, session_id=session_id,
             face_forward=True, forward_duration=duration,
-            audio_key="unknown_greeting"  # Unity fetches GET /audio/unknown_greeting
+            audio_key="unknown_greeting_v2"  # Unity fetches GET /audio/unknown_greeting
         )

@@ -10,7 +10,7 @@ VOICE_UR = "hi-IN-MadhurNeural"
 
 # Fixed phrases — no visitor-specific data, generated once and cached forever
 STATIC_PHRASES = {
-    "unknown_greeting": "Hi! I don't think we've met — what's your name?",
+    "unknown_greeting_v2": "Hi! How may I help you today?",
 }
 
 
