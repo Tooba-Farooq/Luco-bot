@@ -106,19 +106,24 @@ def run_face_recognition(image, db: Session):
       - no stored embedding is within threshold
     """
     try:
-        result = DeepFace.represent(
+        results = DeepFace.represent(
             img_path=image,
             model_name=FACE_RECOGNITION_MODEL,
             detector_backend=FACE_DETECTOR_BACKEND,
             enforce_detection=True
         )
-        incoming_embedding = result[0]["embedding"]
     except ValueError:
         # opencv couldn't find a face this pass — graceful fallback, not a crash
         return None, None
     except Exception as e:
         print(f"Recognition embedding failed unexpectedly: {e}")
         return None, None
+
+    largest_face = max(
+        results,
+        key=lambda r: r["facial_area"]["w"] * r["facial_area"]["h"]
+    )
+    incoming_embedding = largest_face["embedding"]
 
     best_match_name = None
     best_dist = float("inf")
