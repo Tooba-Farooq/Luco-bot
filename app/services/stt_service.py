@@ -1,15 +1,14 @@
+from groq import AsyncGroq
+import asyncio
 import os
-from groq import Groq
 
-GROQ_API_KEY = os.environ["GROQ_API_KEY"]  # never hardcode — rotate the leaked key in Groq's console
+client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "whisper-large-v3-turbo"
 
-client = Groq(api_key=GROQ_API_KEY)
 
-
-def _transcribe_forced(audio_path: str, lang: str) -> dict:
+async def _transcribe_one(audio_path: str, lang: str) -> dict:
     with open(audio_path, "rb") as f:
-        transcription = client.audio.transcriptions.create(
+        transcription = await client.audio.transcriptions.create(
             file=f,
             model=MODEL,
             language=lang,
@@ -27,23 +26,25 @@ def _transcribe_forced(audio_path: str, lang: str) -> dict:
 
     return {
         "text": transcription.text.strip(),
-        "avg_logprob": avg_logprob,
-        "no_speech_prob": no_speech_prob,
-        "score": avg_logprob - no_speech_prob  # higher = more confident
+        "score": avg_logprob - no_speech_prob
     }
 
 
-def transcribe_best_of_two(audio_path: str) -> dict:
+async def transcribe_best_of_two(audio_path: str) -> dict:
     """
-    Runs transcription forced to English and forced to Urdu, picks whichever
-    Whisper was more confident about.
+    Runs transcription forced to English and forced to Urdu IN PARALLEL,
+    picks whichever Whisper was more confident about.
+    Returns: {"text": str, "detected_lang": "en" | "ur"}
     """
-    results = {lang: _transcribe_forced(audio_path, lang) for lang in ["en", "ur"]}
+    en_result, ur_result = await asyncio.gather(
+        _transcribe_one(audio_path, "en"),
+        _transcribe_one(audio_path, "ur")
+    )
+
+    results = {"en": en_result, "ur": ur_result}
     best_lang = max(results, key=lambda l: results[l]["score"])
 
     return {
         "text": results[best_lang]["text"],
-        "detected_lang": best_lang,
-        "en_result": results["en"],
-        "ur_result": results["ur"]
+        "detected_lang": best_lang
     }

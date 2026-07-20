@@ -1,6 +1,6 @@
 # Lucobot Backend
 
-FastAPI backend for the reception robot — handles visitor detection, face recognition, and (soon) visitor/host interaction logic.
+FastAPI backend for the reception robot — handles visitor detection, face recognition, and visitor/host interaction logic.
 
 ## Setup
 
@@ -24,11 +24,18 @@ FastAPI backend for the reception robot — handles visitor detection, face reco
    curl -o face_landmarker.task https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
 ```
 
-4. Run the server (from project root):
+4. Create a `.env` file at the project root with your Groq API key:
+   GROQ_API_KEY=your_key_here
+
+Get a key at [console.groq.com](https://console.groq.com). Used for speech-to-text (Whisper) and intent classification (Llama).
+
+5. Run the server (from project root):
 
 ```bash
    uvicorn app.main:app --reload
 ```
+
+6. Test via Swagger UI: `http://127.0.0.1:8000/docs`
 
 ## API: `/detect`
 
@@ -48,8 +55,9 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
   "visitor_name": "Ahmed" | null,
   "confidence": 0.87 | null,
   "session_id": "abc123" | null,
+  "greeting_text": "Hi! How may I help you today?" | null,
   "audio_base64": "<base64 mp3>" | null,
-  "audio_key": "unknown_greeting" | null
+  "audio_key": "unknown_greeting_v2" | null
 }
 ```
 
@@ -62,42 +70,116 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
 | `known`     | Recognized visitor (3s+ forward-facing confirmed)     | Play greeting audio (`audio_base64`), **stop polling `/detect`**      |
 | `unknown`   | Unrecognized visitor (3s+ forward-facing confirmed)   | Fetch + play greeting audio (`audio_key`), **stop polling `/detect`** |
 
+**Note:** both known and unknown visitors now get the same greeting ("How may I help you today?") — name capture no longer happens at this stage. It happens later, after purpose is captured (see `/session/respond` below).
+
 ### ⚠️ Stop polling once `known` or `unknown` fires
 
-`known` and `unknown` are terminal states for this endpoint — they mean a person has been identified (or confirmed unidentifiable) and the interaction is moving into the greeting/name-capture flow. **Unity should stop calling `/detect` at this point** and move to whatever endpoint handles the next step (name capture, intent, etc. — not yet built). Continuing to poll `/detect` after this point will keep re-running detection and recognition unnecessarily and is not part of the intended flow.
+`known` and `unknown` are terminal states for this endpoint — the interaction moves into the conversational flow (`/session/respond`) from here. **Unity should stop calling `/detect` at this point.** The backend also enforces this server-side — once a session starts, repeated `/detect` calls return the cached result instead of re-running recognition, but Unity should still stop polling on its end to avoid wasted requests.
 
-Polling should only resume once the current visitor's interaction is fully done and the tablet returns to idle (e.g. after `VISIT_LOGGED` or a QR handoff).
+Polling should only resume once the current visitor's interaction is fully done and the tablet returns to idle.
 
 ### `session_id`
 
-Present once status is `known` or `unknown`. Use this to guard against re-triggering the greeting if `/detect` is somehow called again before Unity has moved off this state — the same `session_id` should only produce one greeting playback.
+Present once status is `known` or `unknown`. This same ID must be passed to every subsequent `/session/*` call for this visitor — it's how the backend knows which conversation a given request belongs to.
 
 ### Greeting audio: two delivery paths
 
-There are two different mechanisms depending on whether the greeting is a fixed phrase or contains visitor-specific data:
+| Field          | When present      | What it is                                       | How to use it                                      |
+| -------------- | ----------------- | ------------------------------------------------ | -------------------------------------------------- |
+| `audio_base64` | `status: known`   | Base64-encoded MP3 bytes, inline in the response | Decode and play directly — no extra request needed |
+| `audio_key`    | `status: unknown` | A key identifying a static, pre-generated phrase | Fetch from `GET /audio/{key}`, then play it        |
 
-| Field          | When present      | What it is                                                                       | How to use it                                                            |
-| -------------- | ----------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `audio_base64` | `status: known`   | Base64-encoded MP3 bytes, inline in the response                                 | Decode and play directly — no extra request needed                       |
-| `audio_key`    | `status: unknown` | A key identifying a **static, pre-generated** phrase (e.g. `"unknown_greeting"`) | Fetch the actual audio from `GET /audio/{key}` (see below), then play it |
-
-**Why the split:** the "unknown visitor" greeting is the same fixed sentence every time, so it's generated once at server startup and served as a static file — this avoids re-running TTS generation on every visitor. The "known visitor" greeting contains the visitor's name, so it's different every time and can't be pre-cached — it's generated live and sent inline instead of requiring a second round-trip.
+**Why the split:** the known-visitor greeting contains the visitor's name, so it's generated live per-request. The unknown-visitor greeting is a fixed sentence, generated once at server startup and cached.
 
 ### API: `GET /audio/{key}`
 
-Returns raw `audio/mpeg` bytes for a static, pre-cached greeting phrase (e.g. `GET /audio/unknown_greeting`).
+Returns raw `audio/mpeg` bytes for a static, pre-cached phrase. **Unity should cache this locally after the first fetch** — `Cache-Control: public, max-age=31536000, immutable` is set to support this. Returns `404` if the key doesn't exist.
 
-**⚠️ Unity should cache this file locally after the first fetch.** The backend serves the same bytes for a given `key` every time — nothing about it changes between requests. Fetching it fresh on every `unknown` detection wastes bandwidth and adds unnecessary latency. Recommended approach: fetch once, store the resulting `AudioClip` in memory (or on disk) keyed by `audio_key`, and reuse it for all future `unknown` greetings without hitting this endpoint again. The response includes `Cache-Control` headers to support this if your HTTP client respects them.
+**Currently available static keys:**
 
-Returns `404` if the key doesn't match a known cached phrase.
+| Key                         | Phrase                                                                        |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| `unknown_greeting_v2`       | "Hi! How may I help you today?"                                               |
+| `qr_prompt`                 | "Please scan the QR code so we can continue on your phone." _(not wired yet)_ |
+| `host_notified`             | "I've notified your host — please wait a moment." _(not wired yet)_           |
+| `multiple_matches`          | "I found a few people matching that name — which one did you mean?"           |
+| `no_match_with_suggestions` | "Sorry, I couldn't find anyone by that name. Did you mean one of these?"      |
+| `no_match_no_suggestions`   | "Sorry, I couldn't find anyone by that name in our directory."                |
 
-Cache-Control is set to `public, max-age=31536000, immutable` — safe because each `audio_key` maps to a fixed phrase that never changes at runtime. If you ever edit a static phrase's wording in `tts_service.py`, use a new key (e.g. `unknown_greeting_v2`) rather than reusing the old one, since aggressively-cached clients won't know to drop stale copies otherwise.
+## API: `/session/respond`
 
-### Polling guidance
+**Method:** `POST`
+**Content-Type:** `multipart/form-data`
+**Fields:** `session_id` (string), `audio` (file — WAV recommended)
 
-- Send a frame roughly every 500ms–1s while camera is active and status is `idle` or `detecting`.
-- No need to hold state on the Unity side — backend tracks the forward-facing timer internally between calls.
-- Stop polling once `known` or `unknown` is received (see above).
+Send a recorded audio clip of the visitor speaking. This is the main conversational endpoint — the same one is used at every step of the conversation (intent, host name, purpose, name capture). **What it does with the audio depends entirely on the session's current internal state** — Unity doesn't need to know or track this, just always send audio to this same endpoint whenever a response is expected.
+
+### ⚠️ How to know when to stop recording and send the audio
+
+The visitor doesn't announce when they're done talking — Unity has to detect this itself. Recommended approach:
+
+1. Start recording as soon as the previous prompt's audio finishes playing.
+2. Continuously monitor microphone input volume. Once volume drops below a silence threshold for **~1.5–2 seconds** after speech was detected, stop recording and send what's been captured.
+3. **Always enforce a hard maximum recording length as a safety cap** — around 10–15 seconds — so a mic that fails to detect silence (background noise, technical glitch) doesn't record indefinitely. If the max is hit, stop and send whatever was recorded regardless.
+4. Do not use a fixed recording duration with no silence detection (e.g. "always record exactly 4 seconds") — this either cuts visitors off mid-sentence or leaves awkward dead air if they finish early. Silence detection plus a max-length safety cap is the correct combination, not either alone.
+
+This entire behavior is Unity-side — the backend has no way to know when someone has "stopped talking" other than receiving a complete audio file.
+
+### Response shape
+
+```json
+{
+  "session_id": "abc123",
+  "state": "AWAITING_PURPOSE" | "HOST_SELECTION" | "HOST_SUGGESTIONS" | "NAME_CONFIRMATION" | "QUERY_ANSWERED" | "FALLBACK" | ...,
+  "heard_text": "I want to meet Ahmed",
+  "detected_lang": "en" | "ur",
+  "greeting_text": "Got it — Ahmed Khan. What's the purpose of your visit?" | null,
+  "answer_text": "The washroom is on the 2nd floor." | null,
+  "matched_host": {"id": 3, "name": "Ahmed Khan", "floor_room": "3rd Floor"} | null,
+  "host_candidates": [{"id": 3, "name": "..."}, ...] | null,
+  "audio_base64": "<base64 mp3>" | null,
+  "audio_key": "no_match_with_suggestions" | null
+}
+```
+
+Same audio-delivery rule as `/detect`: if `audio_base64` is present, play it directly; if `audio_key` is present, fetch it from `GET /audio/{key}` first.
+
+### State reference — what Unity should show/do
+
+| `state`             | Meaning                                                     | Unity behavior                                                          |
+| ------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `AWAITING_PURPOSE`  | Host matched, or purpose being asked                        | Play audio, then record next response                                   |
+| `HOST_SELECTION`    | Multiple people matched the spoken name                     | Play audio, **display `host_candidates` as tappable buttons**           |
+| `HOST_SUGGESTIONS`  | No good match — showing suggestions or full directory       | Play audio, **display `host_candidates` as tappable buttons**           |
+| `AWAITING_NAME`     | Purpose captured, now asking visitor's name                 | Play audio, then record next response                                   |
+| `NAME_CONFIRMATION` | Backend heard a name, needs visitor to confirm it's correct | Display `heard_text`, show Yes/No buttons (see `/session/confirm-name`) |
+| `QUERY_ANSWERED`    | General question was answered from the knowledge prompt     | Play `answer_text`, then continue conversation                          |
+| `FALLBACK`          | Question couldn't be answered                               | Play fallback audio                                                     |
+
+### API: `/session/select-host`
+
+**Method:** `POST` (JSON body)
+**Fields:** `session_id`, `employee_id`
+
+Called when the visitor taps a name from `host_candidates` (shown during `HOST_SELECTION` or `HOST_SUGGESTIONS`). Moves the session to `AWAITING_PURPOSE`.
+
+### API: `/session/retry-host-name`
+
+**Method:** `POST` (JSON body)
+**Field:** `session_id`
+
+Called if the visitor rejects all suggestions and wants to say the name again. Moves the session back to `AWAITING_HOST_NAME` — next `/session/respond` call will be treated as a fresh name attempt.
+
+### API: `/session/confirm-name`
+
+**Method:** `POST` (JSON body)
+**Fields:** `session_id`, `confirmed` (boolean)
+
+Called after `NAME_CONFIRMATION` state, when the visitor taps Yes/No on the heard name. `confirmed: true` → moves to `AWAITING_PHOTO`. `confirmed: false` → moves to `AWAITING_NAME_TYPED`, visitor types their name via keyboard instead of retrying voice (endpoint for typed submission not yet built).
+
+### Knowledge base for general queries
+
+There's no separate knowledge-base database table — office info is inlined directly as a short text block in the LLM prompt (see `llm_service.py`). This is intentional: the content is small and doesn't need a full data model. To update what Robo knows, edit the `KNOWLEDGE_TEXT` string directly in that file.
 
 ## API: `/employees`
 

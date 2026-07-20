@@ -20,4 +20,16 @@ class EmployeeCreateResponse(BaseModel):
     photo_path: Optional[str] = None
     embedding_created: bool
 
+class RespondResponse(BaseModel):
+    session_id: str
+    state: str
+    heard_text: str
+    detected_lang: str
+    answer_text: Optional[str] = None
+    matched_host: Optional[dict] = None
+    host_candidates: Optional[list] = None
+    greeting_text: Optional[str] = None      # ← add if missing
+    audio_base64: Optional[str] = None       # ← add if missing
+    audio_key: Optional[str] = None 
+
     

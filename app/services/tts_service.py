@@ -11,7 +11,13 @@ VOICE_UR = "hi-IN-MadhurNeural"
 # Fixed phrases — no visitor-specific data, generated once and cached forever
 STATIC_PHRASES = {
     "unknown_greeting_v2": "Hi! How may I help you today?",
+    "qr_prompt": "Please scan the QR code so we can continue on your phone.",
+    "host_notified": "I've notified your host — please wait a moment.",
+    "multiple_matches": "I found a few people matching that name — which one did you mean?",
+    "no_match_with_suggestions": "Sorry, I couldn't find anyone by that name. Did you mean one of these?",
+    "no_match_no_suggestions": "Sorry, I couldn't find anyone by that name in our directory.",
 }
+
 
 
 async def build_static_audio_cache():
@@ -30,19 +36,18 @@ def get_static_audio_bytes(key: str) -> bytes:
         return f.read()
 
 
-async def generate_known_greeting_audio(visitor_name: str, lang: str = "en") -> str:
+async def generate_dynamic_audio(text: str, lang: str = "en") -> tuple[str, str]:
     """
-    Dynamic greeting — contains the visitor's real name, so it's generated
-    live per-request, not cached. Returns (audio_base64, greeting_text).
+    Generates TTS for arbitrary dynamic text (not cacheable — contains
+    variable content like names). Returns (audio_base64, text).
     """
     voice = VOICE_EN if lang == "en" else VOICE_UR
-    greeting_text = f"Hi {visitor_name}, how may I help you today?"
 
     audio_bytes = b""
-    communicate = edge_tts.Communicate(greeting_text, voice)
+    communicate = edge_tts.Communicate(text, voice)
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":
             audio_bytes += chunk["data"]
 
     audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
-    return audio_base64
+    return audio_base64, text

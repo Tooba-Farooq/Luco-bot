@@ -4,7 +4,7 @@ from app.database import get_db
 from app.models import DetectionResponse
 from app.services.detection_service import check_face_present, check_face_forward, run_face_recognition, _load_image
 from app.services.detection_state import detection_state
-from app.services.tts_service import generate_known_greeting_audio
+from app.services.tts_service import generate_dynamic_audio
 import time
 
 router = APIRouter()
@@ -55,7 +55,7 @@ async def detect(frame: UploadFile = File(...), db: Session = Depends(get_db)):
     session_id = detection_state.start_session()
 
     if status == "known":
-        audio_base64 = await generate_known_greeting_audio(name)
+        audio_base64 = await generate_dynamic_audio(f"Hi {name}! How may I help you?", lang="en")
         return DetectionResponse(
             status=status, session_id=session_id, visitor_name=name, confidence=confidence,
             face_forward=True, forward_duration=duration,
@@ -65,5 +65,5 @@ async def detect(frame: UploadFile = File(...), db: Session = Depends(get_db)):
         return DetectionResponse(
             status=status, session_id=session_id,
             face_forward=True, forward_duration=duration,
-            audio_key="unknown_greeting_v2"  # Unity fetches GET /audio/unknown_greeting
+            audio_key="unknown_greeting_v2"  # Unity fetches GET /audio/unknown_greeting_v2
         )

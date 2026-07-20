@@ -3,8 +3,6 @@ import sounddevice as sd
 from scipy.io.wavfile import write
 import time
 
-GROQ_API_KEY = "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"
-
 SAMPLE_RATE = 16000
 RECORD_SECONDS = 4
 OUTPUT_FILE = "test_recording.wav"

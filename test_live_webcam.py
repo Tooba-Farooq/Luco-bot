@@ -4,13 +4,15 @@ import time
 import base64
 import tempfile
 import os
-from playsound import playsound
+import pygame
 
 API_URL = "http://127.0.0.1:8000/detect"
 AUDIO_URL = "http://127.0.0.1:8000/audio"
-SEND_INTERVAL = 0.7  # seconds between frames, matches your polling guidance
+SEND_INTERVAL = 0.7
 
-cap = cv2.VideoCapture(0)  # 0 = default webcam
+pygame.mixer.init()
+
+cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
     print("Could not open webcam")
@@ -20,37 +22,31 @@ print("Starting live test. Press 'q' in the video window to quit.")
 
 last_sent_time = 0
 status_text = "waiting..."
-last_played_session_id = None  # guards against replaying the greeting every poll
+active_session_id = None  # once set, stop polling /detect
 
 
 def play_audio_bytes(audio_bytes: bytes):
-    """Write mp3 bytes to a temp file and play it (blocking)."""
     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
         f.write(audio_bytes)
         temp_path = f.name
     try:
-        playsound(temp_path)
+        pygame.mixer.music.load(temp_path)
+        pygame.mixer.music.play()
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+        pygame.mixer.music.unload()
     finally:
         os.remove(temp_path)
 
 
 def handle_audio_response(data: dict):
-    global last_played_session_id
-
-    session_id = data.get("session_id")
-    if not session_id or session_id == last_played_session_id:
-        return  # already played this session's greeting, or no session yet
-
     if data.get("audio_base64"):
         audio_bytes = base64.b64decode(data["audio_base64"])
         play_audio_bytes(audio_bytes)
-        last_played_session_id = session_id
-
     elif data.get("audio_key"):
         resp = requests.get(f"{AUDIO_URL}/{data['audio_key']}")
         if resp.status_code == 200:
             play_audio_bytes(resp.content)
-            last_played_session_id = session_id
         else:
             print(f"Failed to fetch static audio: {resp.status_code}")
 
@@ -63,7 +59,8 @@ while True:
 
     now = time.time()
 
-    if now - last_sent_time >= SEND_INTERVAL:
+    # STOP condition — once we have a session, don't call /detect anymore
+    if active_session_id is None and now - last_sent_time >= SEND_INTERVAL:
         last_sent_time = now
 
         success, encoded_image = cv2.imencode('.jpg', frame)
@@ -85,11 +82,17 @@ while True:
                         f"forward={data['face_forward']} "
                         f"duration={data['forward_duration']:.1f}s"
                     )
+                    if data.get("session_id"):
+                        status_text += f" session={data['session_id'][:8]}"
                     if data.get("visitor_name"):
                         status_text += f" name={data['visitor_name']} conf={data.get('confidence', 0):.2f}"
                     print(status_text)
 
-                    handle_audio_response(data)
+                    if data["status"] in ("known", "unknown"):
+                        active_session_id = data["session_id"]
+                        handle_audio_response(data)
+                        print(f"\n>>> Session started: {active_session_id}")
+                        print(">>> Polling stopped. Use this session_id with your /session/respond test script.\n")
 
             except Exception as e:
                 status_text = f"Error: {e}"

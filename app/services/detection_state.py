@@ -1,19 +1,34 @@
 import uuid
 
+import uuid
+
 class DetectionState:
     def __init__(self):
         self.forward_start_time = None
         self.last_seen_forward_time = None
         self.session_id = None
+        self.state = "IDLE"
+        # meet-someone flow
+        self.intent = None
+        self.host_candidates = None
+        self.selected_host_id = None
+        self.purpose = None
+        # name/photo, now captured at the end
+        self.heard_name = None
+        self.detected_lang = None
+        # general query flow
+        self.last_query_answer = None
 
     def reset(self):
-        self.forward_start_time = None
-        self.last_seen_forward_time = None
-        self.session_id = None
+        self.__init__()
 
     def start_session(self):
         self.session_id = str(uuid.uuid4())
+        self.state = "AWAITING_INTENT"
         return self.session_id
+
+
+detection_state = DetectionState()
 
 # single shared instance for now (one tablet, one active visitor at a time)
 detection_state = DetectionState()
