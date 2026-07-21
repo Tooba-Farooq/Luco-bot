@@ -16,6 +16,9 @@ STATIC_PHRASES = {
     "multiple_matches": "I found a few people matching that name — which one did you mean?",
     "no_match_with_suggestions": "Sorry, I couldn't find anyone by that name. Did you mean one of these?",
     "no_match_no_suggestions": "Sorry, I couldn't find anyone by that name in our directory.",
+    "ask_purpose": "Please tell me the purpose of your meeting?",
+    "ask_name": "And what's your name?",
+    "ask_photo": "Great, let's get your photo.",
 }
 
 

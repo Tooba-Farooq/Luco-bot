@@ -70,7 +70,7 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
 | `known`     | Recognized visitor (3s+ forward-facing confirmed)     | Play greeting audio (`audio_base64`), **stop polling `/detect`**      |
 | `unknown`   | Unrecognized visitor (3s+ forward-facing confirmed)   | Fetch + play greeting audio (`audio_key`), **stop polling `/detect`** |
 
-**Note:** the transcript field is unified as `answer_text` for both cases, but the audio still differs: known visitors get a name-specific dynamic greeting, while unknown visitors get the shared static greeting. Name capture no longer happens at this stage; it happens later, after purpose is captured (see `/session/respond` below).
+**Note:** the transcript field is unified as `answer_text` for both cases, but the audio still differs: known visitors get a name-specific dynamic greeting, while unknown visitors get the shared static greeting. Name capture no longer happens at this stage; it happens later, after purpose is captured (see `/session/respond` below) — **and only for unknown visitors** (see the `AWAITING_PURPOSE` note below).
 
 ### ⚠️ Stop polling once `known` or `unknown` fires
 
@@ -105,6 +105,9 @@ Returns raw `audio/mpeg` bytes for a static, pre-cached phrase. **Unity should c
 | `multiple_matches`          | "I found a few people matching that name — which one did you mean?"           |
 | `no_match_with_suggestions` | "Sorry, I couldn't find anyone by that name. Did you mean one of these?"      |
 | `no_match_no_suggestions`   | "Sorry, I couldn't find anyone by that name in our directory."                |
+| `ask_purpose`               | "Please tell me the purpose of your meeting?"                                 |
+| `ask_name`                  | "And what's your name?"                                                       |
+| `ready_for_handoff`         | "Thanks — I'll let them know you're here."                                    |
 
 ## API: `/session/respond`
 
@@ -130,7 +133,7 @@ This entire behavior is Unity-side — the backend has no way to know when someo
 ```json
 {
   "session_id": "abc123",
-  "state": "AWAITING_PURPOSE" | "HOST_SELECTION" | "HOST_SUGGESTIONS" | "NAME_CONFIRMATION" | "QUERY_ANSWERED" | "FALLBACK" | ...,
+  "state": "AWAITING_PURPOSE" | "HOST_SELECTION" | "HOST_SUGGESTIONS" | "AWAITING_NAME" | "NAME_CONFIRMATION" | "READY_FOR_HANDOFF" | "QUERY_ANSWERED" | "FALLBACK" | ...,
   "heard_text": "I want to meet Ahmed",
   "detected_lang": "en" | "ur",
   "answer_text": "The washroom is on the 2nd floor." | null,
@@ -143,17 +146,27 @@ This entire behavior is Unity-side — the backend has no way to know when someo
 
 Same audio-delivery rule as `/detect`: if `audio_base64` is present, play it directly; if `audio_key` is present, fetch it from `GET /audio/{key}` first.
 
+### ⚠️ `AWAITING_PURPOSE` branches based on known vs. unknown visitor
+
+Once the visitor states their purpose, the backend checks whether the original `/detect` call recognized them:
+
+- **Known visitor** → their name and photo are already on file. Session moves straight to `READY_FOR_HANDOFF`, skipping name/photo capture entirely.
+- **Unknown visitor** → session moves to `AWAITING_NAME` to begin name + photo capture.
+
+**Unity does not need to track or check which case applies** — just follow whatever `state` comes back in the response, same as everywhere else in this flow.
+
 ### State reference — what Unity should show/do
 
-| `state`             | Meaning                                                     | Unity behavior                                                          |
-| ------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `AWAITING_PURPOSE`  | Host matched, or purpose being asked                        | Play audio, then record next response                                   |
-| `HOST_SELECTION`    | Multiple people matched the spoken name                     | Play audio, **display `host_candidates` as tappable buttons**           |
-| `HOST_SUGGESTIONS`  | No good match — showing suggestions or full directory       | Play audio, **display `host_candidates` as tappable buttons**           |
-| `AWAITING_NAME`     | Purpose captured, now asking visitor's name                 | Play audio, then record next response                                   |
-| `NAME_CONFIRMATION` | Backend heard a name, needs visitor to confirm it's correct | Display `heard_text`, show Yes/No buttons (see `/session/confirm-name`) |
-| `QUERY_ANSWERED`    | General question was answered from the knowledge prompt     | Play `answer_text`, then continue conversation                          |
-| `FALLBACK`          | Question couldn't be answered                               | Play fallback audio                                                     |
+| `state`             | Meaning                                                          | Unity behavior                                                                                                                                 |
+| ------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AWAITING_PURPOSE`  | Host confirmed, purpose now being asked                          | Play audio, then record next response                                                                                                          |
+| `HOST_SELECTION`    | One or more people matched the spoken name — needs confirmation  | Play audio, **display `host_candidates` as tappable buttons** (see `/session/confirm-host`)                                                    |
+| `HOST_SUGGESTIONS`  | No good fuzzy match — showing weak suggestions or full directory | Play audio, **display `host_candidates` as tappable buttons**                                                                                  |
+| `AWAITING_NAME`     | Purpose captured, unknown visitor — now asking for their name    | Play audio, then record next response                                                                                                          |
+| `NAME_CONFIRMATION` | Backend heard a name — visitor confirms or edits it              | Show name input **pre-filled with `heard_text`**, editable. Submit button calls `/session/submit-name` regardless of whether text was changed. |
+| `READY_FOR_HANDOFF` | Purpose (and name/photo, if unknown) fully captured              | _(Next steps — QR handoff / host alert — not yet built)_                                                                                       |
+| `QUERY_ANSWERED`    | General question was answered from the knowledge prompt          | Play `answer_text`, then continue conversation                                                                                                 |
+| `FALLBACK`          | Question couldn't be answered                                    | Play fallback audio                                                                                                                            |
 
 ### API: `/session/confirm-host`
 
@@ -174,6 +187,15 @@ Called when the visitor confirms a host from `host_candidates` after `HOST_SELEC
 **Field:** `session_id`
 
 ⚠️ **Not implemented — currently returns `501 Not Implemented`.** Placeholder for future Cancel-button behavior. Do not wire the Cancel button to expect real behavior from this yet.
+
+### API: `/session/submit-name`
+
+**Method:** `POST` (JSON body)
+**Fields:** `session_id`, `name`
+
+Called when the visitor submits their name during `NAME_CONFIRMATION`. **UI note:** the name input should be pre-filled with the heard name (`heard_text` from the response that set this state) and left editable — the visitor can submit as-is if correct, or edit it first if wrong, then submit either way. There is no separate "confirm vs. retype" branch; this single endpoint handles both cases identically, since the backend doesn't need to know whether the text was edited.
+
+Moves the session to `AWAITING_PHOTO`. _(Photo capture endpoint not yet built.)_
 
 ### Knowledge base for general queries
 

@@ -13,6 +13,7 @@ class DetectionState:
         self.host_candidates = None
         self.selected_host_id = None
         self.purpose = None
+        self.recognized_name = None
         # name/photo, now captured at the end
         self.heard_name = None
         self.detected_lang = None

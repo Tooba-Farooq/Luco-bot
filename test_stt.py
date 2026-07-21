@@ -1,4 +1,6 @@
 from groq import Groq
+import os
+from dotenv import load_dotenv
 import sounddevice as sd
 from scipy.io.wavfile import write
 import time
@@ -7,6 +9,11 @@ SAMPLE_RATE = 16000
 RECORD_SECONDS = 4
 OUTPUT_FILE = "test_recording.wav"
 MODEL = "whisper-large-v3-turbo"
+
+load_dotenv()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise RuntimeError("GROQ_API_KEY is not set. Add it to your environment before running test_stt.py.")
 
 client = Groq(api_key=GROQ_API_KEY)
 

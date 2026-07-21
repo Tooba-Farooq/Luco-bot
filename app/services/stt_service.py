@@ -30,12 +30,21 @@ async def _transcribe_one(audio_path: str, lang: str) -> dict:
     }
 
 
-async def transcribe_best_of_two(audio_path: str) -> dict:
+async def transcribe_best_of_two(audio_path: str, force_language: str | None = None) -> dict:
     """
     Runs transcription forced to English and forced to Urdu IN PARALLEL,
     picks whichever Whisper was more confident about.
+    Pass force_language="en" (or "ur") to skip the race and use that language directly —
+    useful for fields like names where you don't want phonetic Urdu transcription.
     Returns: {"text": str, "detected_lang": "en" | "ur"}
     """
+    if force_language:
+        result = await _transcribe_one(audio_path, force_language)
+        return {
+            "text": result["text"],
+            "detected_lang": force_language
+        }
+
     en_result, ur_result = await asyncio.gather(
         _transcribe_one(audio_path, "en"),
         _transcribe_one(audio_path, "ur")

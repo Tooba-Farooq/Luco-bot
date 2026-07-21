@@ -55,6 +55,7 @@ async def detect(frame: UploadFile = File(...), db: Session = Depends(get_db)):
     session_id = detection_state.start_session()
 
     if status == "known":
+        detection_state.recognized_name = name
         audio_base64, greeting_text = await generate_dynamic_audio(f"Hi {name}! How may I help you?", lang="ur")
         return DetectionResponse(
             status=status, session_id=session_id, visitor_name=name, confidence=confidence,
@@ -62,6 +63,7 @@ async def detect(frame: UploadFile = File(...), db: Session = Depends(get_db)):
             audio_base64=audio_base64, answer_text=greeting_text
         )
     else:
+        detection_state.recognized_name = None
         return DetectionResponse(
             status=status, session_id=session_id,
             face_forward=True, forward_duration=duration,
