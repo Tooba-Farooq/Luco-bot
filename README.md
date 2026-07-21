@@ -70,7 +70,7 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
 | `known`     | Recognized visitor (3s+ forward-facing confirmed)     | Play greeting audio (`audio_base64`), **stop polling `/detect`**      |
 | `unknown`   | Unrecognized visitor (3s+ forward-facing confirmed)   | Fetch + play greeting audio (`audio_key`), **stop polling `/detect`** |
 
-**Note:** both known and unknown visitors now get the same greeting ("How may I help you today?") — name capture no longer happens at this stage. It happens later, after purpose is captured (see `/session/respond` below).
+**Note:** the transcript field is unified as `answer_text` for both cases, but the audio still differs: known visitors get a name-specific dynamic greeting, while unknown visitors get the shared static greeting. Name capture no longer happens at this stage; it happens later, after purpose is captured (see `/session/respond` below).
 
 ### ⚠️ Stop polling once `known` or `unknown` fires
 
@@ -155,17 +155,17 @@ Same audio-delivery rule as `/detect`: if `audio_base64` is present, play it dir
 | `QUERY_ANSWERED`    | General question was answered from the knowledge prompt     | Play `answer_text`, then continue conversation                          |
 | `FALLBACK`          | Question couldn't be answered                               | Play fallback audio                                                     |
 
-### API: `/session/select-host`
+### API: `/session/confirm-host`
 
 **Method:** `POST` (JSON body)
 **Fields:** `session_id`, `employee_id`
 
-⚠️ **This endpoint is both "select" and "confirm" — there's no separate confirmation step.** Whether one candidate was shown (needing a yes/no) or several (needing a pick), tapping any option and hitting the button calls this same endpoint with that candidate's `employee_id`. Moves the session to `AWAITING_PURPOSE`.
+Called when the visitor confirms a host from `host_candidates` after `HOST_SELECTION`. Moves the session to `AWAITING_PURPOSE`.
 
 **UI behavior:**
 
-- **1 candidate** → show that name with **Confirm** / **Cancel** buttons. Confirm calls this endpoint with that candidate's ID.
-- **2+ candidates** → show all names as tappable options; visitor selects one, then taps **Confirm**, which calls this endpoint with the selected ID.
+- **1 candidate** → backend asks the visitor to confirm the single matched name; tapping **Confirm** calls this endpoint with that candidate's ID.
+- **2+ candidates** → backend shows all matches; visitor selects one, then taps **Confirm**, which calls this endpoint with the selected ID.
 - Cancel is visible in both cases but **not yet wired** — see `/session/cancel-host-selection` below.
 
 ### API: `/session/cancel-host-selection`
