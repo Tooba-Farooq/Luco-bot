@@ -10,6 +10,7 @@ class DetectionResponse(BaseModel):
     audio_base64: Optional[str] = None  # dynamic audio (known-visitor greeting)
     audio_key: Optional[str] = None     # static audio (fetch via GET /audio/{key})
     session_id: Optional[str] = None
+    answer_text: Optional[str] = None
 
 class EmployeeCreateResponse(BaseModel):
     id: int
@@ -28,7 +29,6 @@ class RespondResponse(BaseModel):
     answer_text: Optional[str] = None
     matched_host: Optional[dict] = None
     host_candidates: Optional[list] = None
-    greeting_text: Optional[str] = None      # ← add if missing
     audio_base64: Optional[str] = None       # ← add if missing
     audio_key: Optional[str] = None 
 

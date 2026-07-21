@@ -10,7 +10,7 @@ import time
 router = APIRouter()
 
 GRACE_PERIOD_SECONDS = 1.5  # how long a brief look-away is tolerated before resetting
-FORWARD_DURATION_THRESHOLD = 3.0
+FORWARD_DURATION_THRESHOLD = 2.0  # how long the visitor must be looking forward before we consider them "ready"
 
 
 @router.post("/detect", response_model=DetectionResponse)
@@ -55,15 +55,15 @@ async def detect(frame: UploadFile = File(...), db: Session = Depends(get_db)):
     session_id = detection_state.start_session()
 
     if status == "known":
-        audio_base64 = await generate_dynamic_audio(f"Hi {name}! How may I help you?", lang="en")
+        audio_base64, greeting_text = await generate_dynamic_audio(f"Hi {name}! How may I help you?", lang="ur")
         return DetectionResponse(
             status=status, session_id=session_id, visitor_name=name, confidence=confidence,
             face_forward=True, forward_duration=duration,
-            audio_base64=audio_base64
+            audio_base64=audio_base64, answer_text=greeting_text
         )
     else:
         return DetectionResponse(
             status=status, session_id=session_id,
             face_forward=True, forward_duration=duration,
-            audio_key="unknown_greeting_v2"  # Unity fetches GET /audio/unknown_greeting_v2
+            audio_key="unknown_greeting_v2", answer_text="Hi! How may I help you today?"
         )

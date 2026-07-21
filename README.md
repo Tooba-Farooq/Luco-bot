@@ -55,7 +55,7 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
   "visitor_name": "Ahmed" | null,
   "confidence": 0.87 | null,
   "session_id": "abc123" | null,
-  "greeting_text": "Hi! How may I help you today?" | null,
+  "answer_text": "Hi! How may I help you today?" | null,
   "audio_base64": "<base64 mp3>" | null,
   "audio_key": "unknown_greeting_v2" | null
 }
@@ -133,7 +133,6 @@ This entire behavior is Unity-side — the backend has no way to know when someo
   "state": "AWAITING_PURPOSE" | "HOST_SELECTION" | "HOST_SUGGESTIONS" | "NAME_CONFIRMATION" | "QUERY_ANSWERED" | "FALLBACK" | ...,
   "heard_text": "I want to meet Ahmed",
   "detected_lang": "en" | "ur",
-  "greeting_text": "Got it — Ahmed Khan. What's the purpose of your visit?" | null,
   "answer_text": "The washroom is on the 2nd floor." | null,
   "matched_host": {"id": 3, "name": "Ahmed Khan", "floor_room": "3rd Floor"} | null,
   "host_candidates": [{"id": 3, "name": "..."}, ...] | null,
@@ -161,21 +160,20 @@ Same audio-delivery rule as `/detect`: if `audio_base64` is present, play it dir
 **Method:** `POST` (JSON body)
 **Fields:** `session_id`, `employee_id`
 
-Called when the visitor taps a name from `host_candidates` (shown during `HOST_SELECTION` or `HOST_SUGGESTIONS`). Moves the session to `AWAITING_PURPOSE`.
+⚠️ **This endpoint is both "select" and "confirm" — there's no separate confirmation step.** Whether one candidate was shown (needing a yes/no) or several (needing a pick), tapping any option and hitting the button calls this same endpoint with that candidate's `employee_id`. Moves the session to `AWAITING_PURPOSE`.
 
-### API: `/session/retry-host-name`
+**UI behavior:**
+
+- **1 candidate** → show that name with **Confirm** / **Cancel** buttons. Confirm calls this endpoint with that candidate's ID.
+- **2+ candidates** → show all names as tappable options; visitor selects one, then taps **Confirm**, which calls this endpoint with the selected ID.
+- Cancel is visible in both cases but **not yet wired** — see `/session/cancel-host-selection` below.
+
+### API: `/session/cancel-host-selection`
 
 **Method:** `POST` (JSON body)
 **Field:** `session_id`
 
-Called if the visitor rejects all suggestions and wants to say the name again. Moves the session back to `AWAITING_HOST_NAME` — next `/session/respond` call will be treated as a fresh name attempt.
-
-### API: `/session/confirm-name`
-
-**Method:** `POST` (JSON body)
-**Fields:** `session_id`, `confirmed` (boolean)
-
-Called after `NAME_CONFIRMATION` state, when the visitor taps Yes/No on the heard name. `confirmed: true` → moves to `AWAITING_PHOTO`. `confirmed: false` → moves to `AWAITING_NAME_TYPED`, visitor types their name via keyboard instead of retrying voice (endpoint for typed submission not yet built).
+⚠️ **Not implemented — currently returns `501 Not Implemented`.** Placeholder for future Cancel-button behavior. Do not wire the Cancel button to expect real behavior from this yet.
 
 ### Knowledge base for general queries
 

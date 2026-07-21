@@ -6,7 +6,6 @@ from app.services.llm_service import classify_intent, answer_query
 from app.services.host_service import find_host
 from app.services.detection_state import detection_state
 from app.services.tts_service import generate_dynamic_audio
-# from app.models_db import KnowledgeBase
 from app.models import RespondResponse
 import tempfile
 import os
@@ -113,15 +112,15 @@ async def respond(
 
 async def _handle_host_result(host_result: dict, session_id: str, heard_text: str, detected_lang: str) -> RespondResponse:
     if host_result["result"] == "ONE_MATCH":
-        detection_state.selected_host_id = host_result["employee"]["id"]
-        detection_state.state = "AWAITING_PURPOSE"
-        greeting_text = f"Got it — {host_result['employee']['name']}. What's the purpose of your visit?"
-        audio_base64, _ = await generate_dynamic_audio(greeting_text)  # still dynamic, has a real name
+        detection_state.host_candidates = [host_result["employee"]]
+        detection_state.state = "HOST_SELECTION"
+        answer_text = f"Please confirm, Do you want to meet {host_result['employee']['name']}?"
+        audio_base64, _ = await generate_dynamic_audio(answer_text)
         return RespondResponse(
-            session_id=session_id, state="AWAITING_PURPOSE",
+            session_id=session_id, state="HOST_SELECTION",
             heard_text=heard_text, detected_lang=detected_lang,
-            matched_host=host_result["employee"],
-            greeting_text=greeting_text, audio_base64=audio_base64
+            host_candidates=[host_result["employee"]],
+            answer_text=answer_text, audio_base64=audio_base64
         )
 
     elif host_result["result"] == "MULTIPLE_MATCHES":
@@ -151,3 +150,44 @@ async def _handle_host_result(host_result: dict, session_id: str, heard_text: st
                 host_candidates=[],
                 audio_key="no_match_no_suggestions"
             )
+        
+
+from pydantic import BaseModel
+from app.models_db import Employee
+
+class SelectHostRequest(BaseModel):
+    session_id: str
+    employee_id: int
+
+class RetryHostNameRequest(BaseModel):
+    session_id: str
+
+
+@router.post("/session/confirm-host")
+async def confirm_host(payload: SelectHostRequest, db: Session = Depends(get_db)):
+    if detection_state.session_id != payload.session_id:
+        raise HTTPException(status_code=400, detail="Session mismatch")
+
+    employee = db.query(Employee).filter(Employee.id == payload.employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    detection_state.selected_host_id = employee.id
+    detection_state.host_candidates = None
+    detection_state.state = "AWAITING_PURPOSE"
+    answer_text = f"Please tell me the purpose of your visit?"
+    audio_base64, _ = await generate_dynamic_audio(answer_text)
+
+    return {
+        "session_id": payload.session_id, "state": "AWAITING_PURPOSE",
+        "matched_host": {"id": employee.id, "name": employee.name},
+        "answer_text": answer_text, "audio_base64": audio_base64
+    }
+
+
+@router.post("/session/cancel-host-selection")
+async def cancel_host_selection(payload: RetryHostNameRequest):
+    if detection_state.session_id != payload.session_id:
+        raise HTTPException(status_code=400, detail="Session mismatch")
+    # TODO: decide behavior — back to idle, or retry host name, or something else
+    raise HTTPException(status_code=501, detail="Not implemented yet")
