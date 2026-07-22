@@ -1,19 +1,17 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Networking;
 using System.Collections;
 
 public class CapturePhotoScreen : MonoBehaviour
 {
     [Header("UI References")]
     public RawImage cameraPreview;
-    public RawImage capturedPreview;
-    public GameObject captureButton; // Keep this just in case, or you can hide it!
-    public GameObject retakeButton;
-    public GameObject confirmButton;
     public GameObject promptText;
+    public GameObject retryText; // NEW - shown briefly on 409 failure
 
     [Header("Boundary Outline")]
-    public GameObject boundaryOutline; 
+    public GameObject boundaryOutline;
     public Color detectedColor = Color.green;
     public Color undetectedColor = Color.red;
 
@@ -21,43 +19,29 @@ public class CapturePhotoScreen : MonoBehaviour
     public DeviceCheck deviceCheck;
     public VisitorFlowManager flowManager;
     public FaceExpressionController face;
-    public FaceDetectionService detectionService;
+    public FaceDetectionService detectionService; // only used for baseUrl now
 
     [Header("Audio")]
-    public AudioClip lookAtCameraClip; 
+    public AudioClip lookAtCameraClip;
 
-    private Texture2D capturedTexture;
-    private bool isFaceDetected = false;
-    private Coroutine autocaptureCoroutine = null; // Track our autocapture timer
+    [Header("Polling")]
+    public float pollInterval = 0.3f;
+
+    private bool isPolling = false;
+    private bool captureInFlight = false; // guards against double-firing capture-photo
 
     void OnEnable()
     {
-        if (detectionService != null)
-        {
-            detectionService.OnDetectionResult += HandleDetectionUpdate;
-            detectionService.StartPolling(); 
-        }
-        else
-        {
-            Debug.LogError("CRITICAL: FaceDetectionService is missing from CapturePhotoScreen!", this);
-        }
-        
         if (face != null && lookAtCameraClip != null)
-        {
             face.StartTalking(lookAtCameraClip);
-        }
 
         ResetScreen();
+        StartPolling();
     }
 
     void OnDisable()
     {
-        if (detectionService != null)
-        {
-            detectionService.OnDetectionResult -= HandleDetectionUpdate;
-            detectionService.StopPolling(); 
-        }
-        StopAutocapture();
+        StopPolling();
     }
 
     void Update()
@@ -68,135 +52,157 @@ public class CapturePhotoScreen : MonoBehaviour
         }
     }
 
-    private void HandleDetectionUpdate(DetectResponse result) 
+    // ---------- Polling /session/photo-frame ----------
+
+    private void StartPolling()
     {
-        if (result == null || !cameraPreview.gameObject.activeSelf) return;
+        if (!isPolling)
+        {
+            isPolling = true;
+            StartCoroutine(PollLoop());
+        }
+    }
 
-        isFaceDetected = result.face_forward;
+    private void StopPolling()
+    {
+        isPolling = false;
+    }
 
-        // Apply colors to outline
+    private IEnumerator PollLoop()
+    {
+        while (isPolling)
+        {
+            if (!captureInFlight)
+                yield return StartCoroutine(SendPhotoFrame());
+
+            yield return new WaitForSeconds(pollInterval);
+        }
+    }
+
+    private IEnumerator SendPhotoFrame()
+    {
+        if (deviceCheck.camTexture == null || !deviceCheck.camTexture.isPlaying)
+            yield break;
+
+        byte[] jpegBytes = CaptureCurrentFrameAsJpeg();
+        if (jpegBytes == null) yield break;
+
+        WWWForm form = new WWWForm();
+        form.AddField("session_id", SessionManager.Instance.CurrentSessionId);
+        form.AddBinaryData("frame", jpegBytes, "frame.jpg", "image/jpeg");
+
+        using (UnityWebRequest request = UnityWebRequest.Post($"{detectionService.baseUrl}/session/photo-frame", form))
+        {
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                PhotoFrameResponse response = JsonUtility.FromJson<PhotoFrameResponse>(request.downloadHandler.text);
+                UpdateBoundaryVisual(response);
+
+                if (response.ready_to_capture && !captureInFlight)
+                {
+                    captureInFlight = true;
+                    StopPolling();
+                    StartCoroutine(CapturePhoto(jpegBytes)); // reuse the same frame that triggered readiness
+                }
+            }
+            else
+            {
+                Debug.LogWarning("photo-frame poll failed: " + request.error);
+            }
+        }
+    }
+
+    private byte[] CaptureCurrentFrameAsJpeg()
+    {
+        WebCamTexture cam = deviceCheck.camTexture;
+        Texture2D snap = new Texture2D(cam.width, cam.height, TextureFormat.RGB24, false);
+        snap.SetPixels32(cam.GetPixels32());
+        snap.Apply();
+
+        byte[] jpegBytes = snap.EncodeToJPG(70);
+        Destroy(snap);
+        return jpegBytes;
+    }
+
+    private void UpdateBoundaryVisual(PhotoFrameResponse response)
+    {
+        bool good = response.face_found && response.is_forward && response.is_centered;
+
         if (boundaryOutline != null)
         {
-            Color targetColor = isFaceDetected ? detectedColor : undetectedColor;
+            Color targetColor = good ? detectedColor : undetectedColor;
             foreach (Graphic childGraphic in boundaryOutline.GetComponentsInChildren<Graphic>())
-            {
                 childGraphic.color = targetColor;
-            }
         }
+    }
 
-        // Manage the Autocapture state machine
-        if (isFaceDetected)
+    // ---------- /session/capture-photo ----------
+
+    private IEnumerator CapturePhoto(byte[] jpegBytes)
+    {
+        if (promptText != null) promptText.SetActive(false);
+        if (retryText != null) retryText.SetActive(false);
+
+        WWWForm form = new WWWForm();
+        form.AddField("session_id", SessionManager.Instance.CurrentSessionId);
+        form.AddBinaryData("frame", jpegBytes, "frame.jpg", "image/jpeg");
+
+        using (UnityWebRequest request = UnityWebRequest.Post($"{detectionService.baseUrl}/session/capture-photo", form))
         {
-            // If they just looked forward and we aren't already counting down, start!
-            if (autocaptureCoroutine == null)
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
             {
-                autocaptureCoroutine = StartCoroutine(AutocaptureTimer(1.0f)); // 1.0 second delay
+                SessionResponse response = JsonUtility.FromJson<SessionResponse>(request.downloadHandler.text);
+                Debug.Log("capture-photo success, state: " + response.state);
+
+                if (face != null) face.SetExpression(FaceExpression.Success);
+
+                yield return SessionManager.Instance.PlayResponseAudio(response);
+
+                // Expect READY_FOR_HANDOFF here per the README, but fall back safely either way
+                if (response.state == "READY_FOR_HANDOFF")
+                    flowManager.GoTo(VisitorFlowState.MeetSomeone_ShowSimilarNames);
+                else
+                    flowManager.GoTo(VisitorFlowState.MeetSomeone_ShowSimilarNames); // safe default terminal step
+
+                captureInFlight = false;
+            }
+            else if (request.responseCode == 409)
+            {
+                Debug.LogWarning("capture-photo rejected (409): " + request.downloadHandler.text);
+                if (retryText != null) retryText.SetActive(true);
+                if (promptText != null) promptText.SetActive(true);
+
+                captureInFlight = false;
+                StartPolling(); // resume polling for another attempt
+            }
+            else
+            {
+                Debug.LogWarning("capture-photo failed: " + request.error);
+                captureInFlight = false;
+                StartPolling(); // don't get stuck — just retry
             }
         }
-        else
-        {
-            // If they look away before the capture, cancel the countdown immediately
-            StopAutocapture();
-        }
-
-        // We can keep the manual capture button active just as a backup
-        if (captureButton != null)
-        {
-            captureButton.SetActive(isFaceDetected);
-        }
     }
 
-    private IEnumerator AutocaptureTimer(float delay)
-    {
-        // Wait for the face to stay aligned for the duration of the delay
-        yield return new WaitForSeconds(delay);
-
-        // Snap the photo!
-        Debug.Log("Autocapture triggered!");
-        OnCapture();
-        autocaptureCoroutine = null;
-    }
-
-    private void StopAutocapture()
-    {
-        if (autocaptureCoroutine != null)
-        {
-            StopCoroutine(autocaptureCoroutine);
-            autocaptureCoroutine = null;
-            Debug.Log("Autocapture cancelled (visitor looked away).");
-        }
-    }
-
-    public void OnCapture()
-    {
-        // Prevent autocapture from firing again if they manually pressed it
-        StopAutocapture();
-
-        if (deviceCheck.camTexture == null)
-        {
-            Debug.LogWarning("No camera texture available to capture.");
-            return;
-        }
-
-        WebCamTexture cam = deviceCheck.camTexture;
-        capturedTexture = new Texture2D(cam.width, cam.height, TextureFormat.RGB24, false);
-        capturedTexture.SetPixels(cam.GetPixels());
-        capturedTexture.Apply();
-
-        capturedPreview.texture = capturedTexture;
-        cameraPreview.gameObject.SetActive(false);
-        capturedPreview.gameObject.SetActive(true);
-        
-        if (boundaryOutline != null) 
-            boundaryOutline.SetActive(false); 
-
-        captureButton.SetActive(false);
-        retakeButton.SetActive(true);
-        confirmButton.SetActive(true);
-        promptText.SetActive(false);
-    }
-
-    public void OnRetake()
-    {
-        if (capturedTexture != null)
-            Destroy(capturedTexture);
-
-        ResetScreen();
-    }
-
-    public void OnConfirm()
-    {
-        if (flowManager.Session != null)
-            flowManager.Session.visitorPhoto = capturedTexture;
-
-        if (face != null)
-            face.SetExpression(FaceExpression.Success);
-
-        Debug.Log("Photo confirmed, moving to QR code");
-        flowManager.GoTo(VisitorFlowState.MeetSomeone_ShowSimilarNames); 
-    }
+    // ---------- Reset ----------
 
     public void ResetScreen()
     {
-        StopAutocapture();
-        isFaceDetected = false;
+        captureInFlight = false;
         cameraPreview.gameObject.SetActive(true);
-        capturedPreview.gameObject.SetActive(false);
-        
+
         if (boundaryOutline != null)
         {
             boundaryOutline.SetActive(true);
             foreach (Graphic childGraphic in boundaryOutline.GetComponentsInChildren<Graphic>())
-            {
                 childGraphic.color = undetectedColor;
-            }
         }
 
-        if (captureButton != null)
-            captureButton.SetActive(false); 
-        
-        retakeButton.SetActive(false);
-        confirmButton.SetActive(false);
-        promptText.SetActive(true);
+        if (promptText != null) promptText.SetActive(true);
+        if (retryText != null) retryText.SetActive(false);
     }
 }

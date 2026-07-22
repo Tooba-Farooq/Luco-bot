@@ -21,3 +21,12 @@ public class SessionResponse
     public string audio_base64;
     public string audio_key;
 }
+
+[System.Serializable]
+public class PhotoFrameResponse
+{
+    public bool face_found;
+    public bool is_forward;
+    public bool is_centered;
+    public bool ready_to_capture;
+}
