@@ -19,6 +19,7 @@ class DetectionState:
         self.detected_lang = None
         # general query flow
         self.last_query_answer = None
+        self.photo_steady_start_time = None
 
     def reset(self):
         self.__init__()
@@ -27,9 +28,7 @@ class DetectionState:
         self.session_id = str(uuid.uuid4())
         self.state = "AWAITING_INTENT"
         return self.session_id
-
-
-detection_state = DetectionState()
+    
 
 # single shared instance for now (one tablet, one active visitor at a time)
 detection_state = DetectionState()

@@ -14,6 +14,8 @@ BASE_URL = "http://127.0.0.1:8000"
 RESPOND_URL = f"{BASE_URL}/session/respond"
 CONFIRM_HOST_URL = f"{BASE_URL}/session/confirm-host"
 SUBMIT_NAME_URL = f"{BASE_URL}/session/submit-name"
+PHOTO_FRAME_URL = f"{BASE_URL}/session/photo-frame"
+CAPTURE_PHOTO_URL = f"{BASE_URL}/session/capture-photo"
 AUDIO_URL = f"{BASE_URL}/audio"
 
 SAMPLE_RATE = 16000
@@ -21,7 +23,6 @@ SILENCE_THRESHOLD = 300
 SILENCE_DURATION = 1.5
 MAX_RECORD_SECONDS = 12
 OUTPUT_FILE = "test_respond.wav"
-PHOTO_OUTPUT_FILE = "test_visitor_photo.jpg"
 
 
 def init_audio_player():
@@ -68,8 +69,6 @@ def record_until_silence():
     silence_time = 0.0
     speech_started = False
     start_time = time.time()
-
-    
 
     stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="int16")
     stream.start()
@@ -179,32 +178,92 @@ def handle_name_confirmation(data: dict, session_id: str):
     return send_submit_name(session_id, name)
 
 
-def capture_photo_to_file() -> str | None:
+def send_photo_frame(session_id: str, frame) -> dict | None:
+    success, encoded = cv2.imencode(".jpg", frame)
+    if not success:
+        return None
+    response = requests.post(
+        PHOTO_FRAME_URL,
+        data={"session_id": session_id},
+        files={"frame": ("frame.jpg", encoded.tobytes(), "image/jpeg")},
+        timeout=30,
+    )
+    if response.status_code != 200:
+        print(f"photo-frame error {response.status_code}: {response.text}")
+        return None
+    return response.json()
+
+
+def send_capture_photo(session_id: str, frame) -> dict | None:
+    success, encoded = cv2.imencode(".jpg", frame)
+    if not success:
+        return None
+    response = requests.post(
+        CAPTURE_PHOTO_URL,
+        data={"session_id": session_id},
+        files={"frame": ("frame.jpg", encoded.tobytes(), "image/jpeg")},
+        timeout=30,
+    )
+    if response.status_code != 200:
+        print(f"capture-photo error {response.status_code}: {response.text}")
+        return None
+
+    data = response.json()
+    print(f"\nRobo: {data.get('answer_text')}")
+    play_response_audio(data)
+    return data
+
+
+def run_photo_capture(session_id: str) -> dict | None:
+    """Live boundary-check loop: polls /session/photo-frame every ~300ms,
+    shows red/green feedback, auto-captures once ready_to_capture is True."""
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Could not open webcam for photo capture.")
         return None
 
-    print("Photo capture: press 'c' to capture, or 'q' to skip.")
+    print("Photo capture: hold still, boundary turns green when ready. Press 'q' to cancel.")
+    last_poll = 0
+    POLL_INTERVAL = 0.3
+    result_data = None
+
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
                 print("Failed to grab webcam frame.")
-                return None
+                break
 
-            cv2.imshow("Photo Capture - c to capture, q to skip", frame)
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord("c"):
-                cv2.imwrite(PHOTO_OUTPUT_FILE, frame)
-                print(f"Saved photo to {PHOTO_OUTPUT_FILE}")
-                return PHOTO_OUTPUT_FILE
-            if key == ord("q"):
-                print("Skipped photo capture.")
-                return None
+            now = time.time()
+            color = (0, 0, 255)  # red by default
+            status_text = "checking..."
+
+            if now - last_poll >= POLL_INTERVAL:
+                last_poll = now
+                check = send_photo_frame(session_id, frame)
+                if check:
+                    if check.get("face_found") and check.get("is_forward") and check.get("is_centered"):
+                        color = (0, 255, 0)  # green
+                    status_text = str(check)
+
+                    if check.get("ready_to_capture"):
+                        print("\nReady — capturing...")
+                        result_data = send_capture_photo(session_id, frame)
+                        break
+
+            h, w = frame.shape[:2]
+            cv2.rectangle(frame, (int(w*0.25), int(h*0.15)), (int(w*0.75), int(h*0.85)), color, 3)
+            cv2.putText(frame, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+            cv2.imshow("Photo Capture - q to cancel", frame)
+
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                print("Cancelled photo capture.")
+                break
     finally:
         cap.release()
         cv2.destroyAllWindows()
+
+    return result_data
 
 
 def simulate_conversation(session_id: str):
@@ -222,13 +281,14 @@ def simulate_conversation(session_id: str):
                 break
             state = data.get("state")
 
-        if state == "AWAITING_PHOTO":
-            capture_photo_to_file()
-            print("Reached AWAITING_PHOTO. Backend photo submission is not implemented yet, so the simulation stops here.")
-            break
-
         if state == "NAME_CONFIRMATION":
             data = handle_name_confirmation(data, session_id)
+            if data is None:
+                break
+            state = data.get("state")
+
+        if state == "AWAITING_PHOTO":
+            data = run_photo_capture(session_id)
             if data is None:
                 break
             state = data.get("state")

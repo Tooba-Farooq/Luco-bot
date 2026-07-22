@@ -1,5 +1,10 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
+
+
+class HostSummary(BaseModel):
+    id: int
+    name: str
 
 class DetectionResponse(BaseModel):
     status: str
@@ -27,9 +32,45 @@ class RespondResponse(BaseModel):
     heard_text: str
     detected_lang: str
     answer_text: Optional[str] = None
-    matched_host: Optional[dict] = None
-    host_candidates: Optional[list] = None
+    matched_host: Optional[HostSummary] = None
+    host_candidates: Optional[List[HostSummary]] = None
     audio_base64: Optional[str] = None       # ← add if missing
     audio_key: Optional[str] = None 
+
+class PhotoFrameResponse(BaseModel):
+    face_found: bool
+    is_forward: bool
+    is_centered: bool
+    ready_to_capture: bool
+
+
+class SelectHostRequest(BaseModel):
+    session_id: str
+    employee_id: int
+
+
+class RetryHostNameRequest(BaseModel):
+    session_id: str
+
+
+class SubmitNameRequest(BaseModel):
+    session_id: str
+    name: str
+
+
+class ConfirmHostResponse(BaseModel):
+    session_id: str
+    state: str
+    matched_host: HostSummary
+    answer_text: str
+    audio_key: str
+
+
+class SubmitNameResponse(BaseModel):
+    session_id: str
+    state: str
+    visitor_name: str
+    answer_text: str
+    audio_key: str
 
     

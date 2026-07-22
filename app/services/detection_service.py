@@ -144,3 +144,18 @@ def run_face_recognition(image, db: Session):
         return best_match_name, confidence
 
     return None, None
+
+def check_face_centered(image, face_box, tolerance: float = 0.15) -> bool:
+    """
+    Returns True if the face's center is within `tolerance` (as a fraction
+    of image width/height) of the image's center.
+    """
+    h, w, _ = image.shape
+    box_x, box_y, box_w, box_h = face_box
+    face_center_x = box_x + box_w / 2
+    face_center_y = box_y + box_h / 2
+
+    x_offset = abs(face_center_x - w / 2) / w
+    y_offset = abs(face_center_y - h / 2) / h
+
+    return x_offset < tolerance and y_offset < tolerance

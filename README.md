@@ -133,7 +133,7 @@ This entire behavior is Unity-side — the backend has no way to know when someo
 ```json
 {
   "session_id": "abc123",
-  "state": "AWAITING_PURPOSE" | "HOST_SELECTION" | "HOST_SUGGESTIONS" | "AWAITING_NAME" | "NAME_CONFIRMATION" | "READY_FOR_HANDOFF" | "QUERY_ANSWERED" | "FALLBACK" | ...,
+  "state": "AWAITING_PURPOSE" | "HOST_SELECTION" | "HOST_SUGGESTIONS" | "AWAITING_NAME" | "NAME_CONFIRMATION" | "AWAITING_PHOTO" | "READY_FOR_HANDOFF" | "QUERY_ANSWERED" | "FALLBACK" | ...,
   "heard_text": "I want to meet Ahmed",
   "detected_lang": "en" | "ur",
   "answer_text": "The washroom is on the 2nd floor." | null,
@@ -164,6 +164,7 @@ Once the visitor states their purpose, the backend checks whether the original `
 | `HOST_SUGGESTIONS`  | No good fuzzy match — showing weak suggestions or full directory | Play audio, **display `host_candidates` as tappable buttons**                                                                                  |
 | `AWAITING_NAME`     | Purpose captured, unknown visitor — now asking for their name    | Play audio, then record next response                                                                                                          |
 | `NAME_CONFIRMATION` | Backend heard a name — visitor confirms or edits it              | Show name input **pre-filled with `heard_text`**, editable. Submit button calls `/session/submit-name` regardless of whether text was changed. |
+| `AWAITING_PHOTO`    | Name submitted — now capturing the visitor's photo               | Open camera view. See `/session/photo-frame` and `/session/capture-photo` below.                                                               |
 | `READY_FOR_HANDOFF` | Purpose (and name/photo, if unknown) fully captured              | _(Next steps — QR handoff / host alert — not yet built)_                                                                                       |
 | `QUERY_ANSWERED`    | General question was answered from the knowledge prompt          | Play `answer_text`, then continue conversation                                                                                                 |
 | `FALLBACK`          | Question couldn't be answered                                    | Play fallback audio                                                                                                                            |
@@ -195,7 +196,49 @@ Called when the visitor confirms a host from `host_candidates` after `HOST_SELEC
 
 Called when the visitor submits their name during `NAME_CONFIRMATION`. **UI note:** the name input should be pre-filled with the heard name (`heard_text` from the response that set this state) and left editable — the visitor can submit as-is if correct, or edit it first if wrong, then submit either way. There is no separate "confirm vs. retype" branch; this single endpoint handles both cases identically, since the backend doesn't need to know whether the text was edited.
 
-Moves the session to `AWAITING_PHOTO`. _(Photo capture endpoint not yet built.)_
+Moves the session to `AWAITING_PHOTO`.
+
+### API: `/session/photo-frame`
+
+**Method:** `POST`
+**Content-Type:** `multipart/form-data`
+**Fields:** `session_id`, `frame` (image file)
+
+Poll this endpoint continuously (same cadence as `/detect`, roughly every 200–500ms) while `AWAITING_PHOTO` is active and the camera view is open. Backend checks each frame for face presence, forward-facing angle, and centering, and tracks how long the frame has stayed "good" continuously.
+
+**Response shape:**
+
+```json
+{
+  "face_found": true,
+  "is_forward": true,
+  "is_centered": true,
+  "ready_to_capture": true
+}
+```
+
+**Unity behavior:**
+
+- Boundary is **red** whenever `face_found` is `false`, or `is_forward`/`is_centered` is `false`.
+- Boundary turns **green** when `face_found`, `is_forward`, and `is_centered` are all `true`.
+- **`ready_to_capture: true`** means the frame has stayed good continuously for the required hold duration (~1 second) — this is backend-tracked, not something Unity needs to time itself. The instant this flips `true`, call `/session/capture-photo` with the current frame.
+- If the visitor moves out of position at any point, the hold timer resets server-side automatically — Unity doesn't need to manage this either, just keep polling and reading `ready_to_capture`.
+
+### API: `/session/capture-photo`
+
+**Method:** `POST`
+**Content-Type:** `multipart/form-data`
+**Fields:** `session_id`, `frame` (image file)
+
+Called once `ready_to_capture` is `true` from `/session/photo-frame`. Backend re-verifies face quality server-side (even though the client already saw green — never trust client-side checks alone), runs a blur check, and if everything passes: saves the photo, generates a face embedding, creates the `Visitor` record, and creates the `VisitLog` record for this visit (see note below on `VisitLog` timing).
+
+**On success** → moves to `READY_FOR_HANDOFF`, returns the next prompt.
+
+**On failure** (blurry, face check failed server-side) → returns `409 Conflict` with a reason. Unity should show a brief retry message and resume polling `/session/photo-frame`.
+
+### `VisitLog` is created at photo-capture time, not at the very end
+
+This is intentional: the `VisitLog` row (and the `Visitor` row it references) is created as soon as the visitor's identity is captured — right after a successful `/session/capture-photo` for unknown visitors, or right after purpose capture for known visitors — with `status: "in_progress"`. This ensures there's a traceable record of the visitor entering the building even if the interaction is later abandoned (host never responds, visitor leaves) before reaching a final outcome. The row is then **updated**, not recreated, once the visit concludes (see `/session/close`, not yet built).
 
 ### Knowledge base for general queries
 
