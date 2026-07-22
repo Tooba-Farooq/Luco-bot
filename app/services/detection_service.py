@@ -145,10 +145,13 @@ def run_face_recognition(image, db: Session):
 
     return None, None
 
-def check_face_centered(image, face_box, tolerance: float = 0.15) -> bool:
+def check_face_centered(image, face_box, x_tolerance: float = 0.15, y_tolerance: float = 0.30) -> bool:
     """
-    Returns True if the face's center is within `tolerance` (as a fraction
+    Returns True if the face's center is within tolerance (as a fraction
     of image width/height) of the image's center.
+    Separate x/y tolerances: y is looser by default since occluded faces
+    (e.g. niqab) can shift the detected box's vertical center even when
+    the visitor is genuinely centered and looking forward.
     """
     h, w, _ = image.shape
     box_x, box_y, box_w, box_h = face_box
@@ -158,4 +161,4 @@ def check_face_centered(image, face_box, tolerance: float = 0.15) -> bool:
     x_offset = abs(face_center_x - w / 2) / w
     y_offset = abs(face_center_y - h / 2) / h
 
-    return x_offset < tolerance and y_offset < tolerance
+    return x_offset < x_tolerance and y_offset < y_tolerance

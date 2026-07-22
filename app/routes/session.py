@@ -81,20 +81,20 @@ async def respond(
             answer = await answer_query(heard_text)
 
             if answer == "NO_MATCH":
-                detection_state.state = "FALLBACK"
+                detection_state.state = "ANYTHING_ELSE"  # CHANGED: backend now expects the follow-up
                 return RespondResponse(
-                    session_id=session_id, state="FALLBACK",
+                    session_id=session_id, state="FALLBACK",  # unchanged — still tells frontend what happened
                     heard_text=heard_text, detected_lang=detected_lang,
                     answer_text="I'm not sure about that — Is there anything else I can help you with?"
                 )
             else:
-                detection_state.state = "QUERY_ANSWERED"
+                detection_state.state = "ANYTHING_ELSE"  # CHANGED
                 return RespondResponse(
                     session_id=session_id, state="QUERY_ANSWERED",
                     heard_text=heard_text, detected_lang=detected_lang,
                     answer_text=answer
                 )
-
+            
     elif current_state == "AWAITING_HOST_NAME":
         host_result = find_host(heard_text, db)
         return await _handle_host_result(host_result, session_id, heard_text, detected_lang)
@@ -300,7 +300,7 @@ async def capture_photo(session_id: str = Form(...), frame: UploadFile = File(..
     face_found, face_box = check_face_present(image)
     if not face_found or not check_face_forward(image, face_box) or not check_face_centered(image, face_box):
         raise HTTPException(status_code=409, detail="Face not steady — retry capture")
-    
+
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
     print(f"Blur score: {blur_score:.1f}")  # temporary, remove once calibrated
@@ -311,23 +311,22 @@ async def capture_photo(session_id: str = Form(...), frame: UploadFile = File(..
     photo_path = os.path.join(PHOTO_DIR, f"{uuid.uuid4().hex}.jpg")
     cv2.imwrite(photo_path, image)
 
-    # embed it from the saved file
+    # CHANGED: embedding may legitimately fail for occluded faces (niqab, mask, etc.) —
+    # same limitation as run_face_recognition's opencv backend hitting enforce_detection=True.
+    # This is not an error condition; don't delete the photo or block capture on it.
     embedding = generate_face_embedding(photo_path)
     if embedding is None:
-        os.remove(photo_path)
-        raise HTTPException(status_code=409, detail="Could not extract a clear embedding — retry capture")
+        print(f"No embedding extracted for {photo_path} (occluded face or detector miss) — saving visitor without one.")
 
     new_visitor = Visitor(
-    name=detection_state.heard_name,
-    face_embedding=embedding,
-    photo_path=photo_path
-)
+        name=detection_state.heard_name,
+        face_embedding=embedding,  # may be None — that's fine, matches /detect's "unknown" tolerance
+        photo_path=photo_path
+    )
     db.add(new_visitor)
     db.commit()
     db.refresh(new_visitor)
 
-    # create the VisitLog row now, not at the end — gives traceability even if
-    # the visitor never makes it to a completed handoff
     new_visit = VisitLog(
         visitor_id=new_visitor.id,
         host_employee_id=detection_state.selected_host_id,
@@ -339,7 +338,7 @@ async def capture_photo(session_id: str = Form(...), frame: UploadFile = File(..
     db.refresh(new_visit)
 
     detection_state.visitor_id = new_visitor.id
-    detection_state.visit_log_id = new_visit.id  # needed so /session/close can find + update this exact row
+    detection_state.visit_log_id = new_visit.id
     detection_state.state = "READY_FOR_HANDOFF"
 
     return {
