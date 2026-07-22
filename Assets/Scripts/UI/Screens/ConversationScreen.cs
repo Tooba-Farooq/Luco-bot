@@ -62,6 +62,7 @@ public class ConversationScreen : MonoBehaviour
             case "AWAITING_PURPOSE":
             case "AWAITING_NAME":
             case "AWAITING_HOST_NAME":
+            case "AWAITING_INTENT":
                 StartListening(); // continue the conversation loop
                 break;
 
