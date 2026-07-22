@@ -4,15 +4,15 @@ public enum VisitorFlowState
     DetectingPerson,
     FaceRecognition,
     GreetKnownVisitor,
-    CollectName,
+    CollectName,              // NOTE: repurposed as "AskVisitorName" for hardcoded demo flow
     ConfirmSpelling,
     CapturePhoto,
     AskPurpose,
     IntentBranch,
     GeneralQuery,
-    MeetSomeone_EnterHostName,
-    MeetSomeone_HostLookup,
-    MeetSomeone_ShowSimilarNames,
+    MeetSomeone_EnterHostName,   // NOTE: repurposed as "AskHostName"
+    MeetSomeone_HostLookup,      // NOTE: repurposed as "ConfirmHostName"
+    MeetSomeone_ShowSimilarNames,// NOTE: repurposed as "QRCode screen"
     MeetSomeone_EnterPurpose,
     AlertingHost,
     WaitingHostResponse,

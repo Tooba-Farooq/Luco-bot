@@ -13,12 +13,14 @@ public class DetectResponse
     public string session_id;
     public string audio_base64;
     public string audio_key;
+    public string greeting_text;
 }
 
 public class FaceDetectionService : MonoBehaviour
 {
     [Header("Backend")]
-    public string baseUrl = "http://192.168.100.141::8000"; // replace with YOUR PC's IP from ipconfig
+    // FIXED: Corrected double colon typo "::8000" to ":8000"
+    public string baseUrl = "http://192.168.100.141:8000"; 
 
     [Header("References")]
     public WebCamTexture webcamTexture;
@@ -30,17 +32,18 @@ public class FaceDetectionService : MonoBehaviour
 
     public void StartPolling()
     {   
-
         if (!isPolling)
         {
             isPolling = true;
             StartCoroutine(PollLoop());
+            Debug.Log("Polling Started.");
         }
     }
 
     public void StopPolling()
     {
         isPolling = false;
+        Debug.Log("Polling Stopped.");
     }
 
     IEnumerator PollLoop()
@@ -60,10 +63,10 @@ public class FaceDetectionService : MonoBehaviour
         Color32[] pixels = webcamTexture.GetPixels32();
 
         Texture2D snap = new Texture2D(
-        webcamTexture.width,
-        webcamTexture.height,
-        TextureFormat.RGB24,
-        false);
+            webcamTexture.width,
+            webcamTexture.height,
+            TextureFormat.RGB24,
+            false);
 
         snap.SetPixels32(pixels);
         snap.Apply();

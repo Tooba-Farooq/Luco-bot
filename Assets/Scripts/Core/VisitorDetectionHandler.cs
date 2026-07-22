@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
-using TMPro; // Added for TextMeshPro support. If using legacy Text, use UnityEngine.UI instead.
 
 public class VisitorDetectionHandler : MonoBehaviour
 {
@@ -10,12 +9,6 @@ public class VisitorDetectionHandler : MonoBehaviour
     public FaceExpressionController face;
     public VisitorFlowManager flowManager;
 
-    [Header("UI Reference")]
-    // Drag your TextMeshPro UGUI component here in the Unity Inspector
-    [SerializeField] private TextMeshProUGUI debugStatusText; 
-
-    [Header("Testing Controls")]
-    [SerializeField] private float testReturnDelay = 5f;
     private string lastStatus = "";
     private string lastSessionId = "";
     private Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
@@ -46,51 +39,35 @@ public class VisitorDetectionHandler : MonoBehaviour
         {
             case "idle":
                 face.ReturnToIdle();
-                UpdateStatusText("System: Idle");
                 flowManager.GoTo(VisitorFlowState.Idle);
                 break;
 
             case "detecting":
-                UpdateStatusText("Status: Detecting Person...");
                 flowManager.GoTo(VisitorFlowState.DetectingPerson);
                 break;
 
             case "unknown":
                 if (result.session_id == lastSessionId) return;
                 lastSessionId = result.session_id;
-
+                SessionManager.Instance.BeginSession(result.session_id); // ADD
+                flowManager.Session.isKnownVisitor = false; // ADD (explicit, matches Reset() default)
                 detectionService.StopPolling();
-                face.SetExpression(FaceExpression.Happy);
-                
-                UpdateStatusText("Status: Processing Unknown Visitor");
-                
                 StartCoroutine(PlayCachedOrFetchAudio(result.audio_key));
-                //flowManager.GoTo(VisitorFlowState.CollectName);
-                StartCoroutine(ReturnToIdleAfterDelay(testReturnDelay));
+              
                 break;
 
             case "known":
                 if (result.session_id == lastSessionId) return;
                 lastSessionId = result.session_id;
-
+                SessionManager.Instance.BeginSession(result.session_id); // ADD
+                flowManager.Session.isKnownVisitor = true;      // ADD — while we're here, this should be set too
+                flowManager.Session.visitorName = result.visitor_name; // ADD — needed for known-visitor handoff/QR screen
                 detectionService.StopPolling();
-                face.SetExpression(FaceExpression.Happy);
-                
-                UpdateStatusText($"Status: Greeted Known ({result.visitor_name})");
-                
                 PlayBase64Audio(result.audio_base64);
 
-                if (flowManager.Session != null)
-                {
-                    flowManager.Session.visitorName = result.visitor_name;
-                }
-
-                flowManager.GoTo(VisitorFlowState.GreetKnownVisitor);
-                //StartCoroutine(AdvanceToAskPurposeAfterGreeting());
-                StartCoroutine(ReturnToIdleAfterDelay(testReturnDelay));
                 break;
         }
-    } 
+    }
 
     // ---------- KNOWN: inline base64 audio ----------
 
@@ -99,10 +76,10 @@ public class VisitorDetectionHandler : MonoBehaviour
         if (string.IsNullOrEmpty(base64)) return;
 
         byte[] audioBytes = System.Convert.FromBase64String(base64);
-        StartCoroutine(PlayAudioBytes(audioBytes));
+        StartCoroutine(PlayAudioBytesAndAdvance(audioBytes));
     }
 
-    private IEnumerator PlayAudioBytes(byte[] mp3Bytes)
+    private IEnumerator PlayAudioBytesAndAdvance(byte[] mp3Bytes)
     {
         string tempPath = Application.temporaryCachePath + "/greeting_temp.mp3";
         System.IO.File.WriteAllBytes(tempPath, mp3Bytes);
@@ -115,31 +92,30 @@ public class VisitorDetectionHandler : MonoBehaviour
             {
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
                 face.StartTalking(clip);
+                yield return AdvanceAfterGreeting(clip);
             }
             else
             {
                 Debug.LogWarning("Failed to decode greeting audio: " + www.error);
+                yield return AdvanceAfterGreeting(null); // still advance even if audio failed
             }
         }
-    }
-
-    // ---------- KNOWN: advance to AskPurpose after greeting ----------
-
-    private IEnumerator AdvanceToAskPurposeAfterGreeting()
-    {
-        yield return new WaitForSeconds(3f); // gives the greeting audio time to play — tune as needed
-        flowManager.GoTo(VisitorFlowState.AskPurpose);
     }
 
     // ---------- UNKNOWN: fetch + cache from /audio/{key} ----------
 
     private IEnumerator PlayCachedOrFetchAudio(string key)
     {
-        if (string.IsNullOrEmpty(key)) yield break;
+        if (string.IsNullOrEmpty(key))
+        {
+            yield return AdvanceAfterGreeting(null);
+            yield break;
+        }
 
         if (audioCache.TryGetValue(key, out AudioClip cached))
         {
             face.StartTalking(cached);
+            yield return AdvanceAfterGreeting(cached);
             yield break;
         }
 
@@ -153,38 +129,22 @@ public class VisitorDetectionHandler : MonoBehaviour
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
                 audioCache[key] = clip;
                 face.StartTalking(clip);
+                yield return AdvanceAfterGreeting(clip);
             }
             else
             {
                 Debug.LogWarning("Failed to fetch audio for key '" + key + "': " + www.error);
+                yield return AdvanceAfterGreeting(null);
             }
         }
     }
 
-    // ---------- Helper to Update UI safely ----------
-    private void UpdateStatusText(string text)
-    {
-        if (debugStatusText != null)
-        {
-            debugStatusText.text = text;
-        }
-    }
+    // ---------- Shared advance logic ----------
 
-    //BacktoIdle
-    private IEnumerator ReturnToIdleAfterDelay(float delay)
+    private IEnumerator AdvanceAfterGreeting(AudioClip clip)
     {
-        // Visual indicator that it's waiting to reset
-        UpdateStatusText($"Returning to Idle in {delay:F1}s...");
-        
-        yield return new WaitForSeconds(delay);
-        
-        Debug.Log($"[Test] Returning to Idle state after {delay} seconds.");
-        face.ReturnToIdle();
-        
-        // This is the moment it transitions back:
-        UpdateStatusText("System: Idle");
-        
-        detectionService.StartPolling();
-        flowManager.GoTo(VisitorFlowState.Idle);
+        float waitTime = (clip != null) ? clip.length + 0.3f : 2f;
+        yield return new WaitForSeconds(waitTime);
+        flowManager.GoTo(VisitorFlowState.MeetSomeone_EnterHostName);
     }
 }
