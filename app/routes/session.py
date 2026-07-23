@@ -103,6 +103,26 @@ async def respond(
         detection_state.purpose = heard_text
 
         if detection_state.recognized_name:
+            if detection_state.visitor_id is None:
+                matched_visitor = (
+                    db.query(Visitor)
+                    .filter(Visitor.name == detection_state.recognized_name)
+                    .order_by(Visitor.id.desc())
+                    .first()
+                )
+                if matched_visitor:
+                    detection_state.visitor_id = matched_visitor.id
+                else:
+                    new_visitor = Visitor(
+                        name=detection_state.recognized_name,
+                        face_embedding=None,
+                        photo_path=None,
+                    )
+                    db.add(new_visitor)
+                    db.commit()
+                    db.refresh(new_visitor)
+                    detection_state.visitor_id = new_visitor.id
+
             # known visitor — find their existing Visitor/Employee record, or create
             # a lightweight VisitLog tied to them directly
             new_visit = VisitLog(
