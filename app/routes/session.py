@@ -327,6 +327,8 @@ async def capture_photo(session_id: str = Form(...), frame: UploadFile = File(..
     db.commit()
     db.refresh(new_visitor)
 
+    detection_state.visitor_id = new_visitor.id
+
     new_visit = VisitLog(
         visitor_id=new_visitor.id,
         host_employee_id=detection_state.selected_host_id,
@@ -337,7 +339,7 @@ async def capture_photo(session_id: str = Form(...), frame: UploadFile = File(..
     db.commit()
     db.refresh(new_visit)
 
-    detection_state.visitor_id = new_visitor.id
+    
     detection_state.visit_log_id = new_visit.id
     detection_state.state = "READY_FOR_HANDOFF"
 

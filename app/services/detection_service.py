@@ -93,6 +93,15 @@ def _cosine_distance(emb1, emb2):
     return 1 - (np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
 
+def _is_valid_embedding(embedding) -> bool:
+    return (
+        embedding is not None
+        and isinstance(embedding, (list, tuple))
+        and len(embedding) > 0
+        and all(value is not None for value in embedding)
+    )
+
+
 def run_face_recognition(image, db: Session):
     """
     image: decoded numpy array (BGR), already confirmed forward-facing by the poll loop.
@@ -128,10 +137,14 @@ def run_face_recognition(image, db: Session):
     best_match_name = None
     best_dist = float("inf")
 
-    known_people = (
-        db.query(Employee).filter(Employee.face_embedding.isnot(None)).all()
-        + db.query(Visitor).filter(Visitor.face_embedding.isnot(None)).all()
-    )
+    known_people = [
+        person
+        for person in (
+            db.query(Employee).filter(Employee.face_embedding.isnot(None)).all()
+            + db.query(Visitor).filter(Visitor.face_embedding.isnot(None)).all()
+        )
+        if _is_valid_embedding(person.face_embedding)
+    ]
 
     for person in known_people:
         dist = _cosine_distance(incoming_embedding, person.face_embedding)

@@ -18,6 +18,8 @@ class DetectionResponse(BaseModel):
     session_id: Optional[str] = None
     answer_text: Optional[str] = None
 
+from typing import Optional
+
 class EmployeeCreateResponse(BaseModel):
     id: int
     name: str
