@@ -5,6 +5,7 @@ from typing import List, Optional
 class HostSummary(BaseModel):
     id: int
     name: str
+    floor_room: Optional[str] = None
 
 class DetectionResponse(BaseModel):
     status: str

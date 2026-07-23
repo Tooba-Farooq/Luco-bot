@@ -1,13 +1,13 @@
 import uuid
 
-import uuid
-
 class DetectionState:
     def __init__(self):
         self.forward_start_time = None
         self.last_seen_forward_time = None
         self.session_id = None
         self.state = "IDLE"
+        self.visitor_id = None
+        self.visit_log_id = None
         # meet-someone flow
         self.intent = None
         self.host_candidates = None
@@ -20,6 +20,7 @@ class DetectionState:
         # general query flow
         self.last_query_answer = None
         self.photo_steady_start_time = None
+        
 
     def reset(self):
         self.__init__()

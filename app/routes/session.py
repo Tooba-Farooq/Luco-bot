@@ -245,7 +245,7 @@ PHOTO_DIR = "visitor_photos"
 os.makedirs(PHOTO_DIR, exist_ok=True)
 
 
-PHOTO_STEADY_THRESHOLD = 1.0  # seconds the frame must stay green before ready-to-capture
+PHOTO_STEADY_THRESHOLD = 2.0  # seconds the frame must stay green before ready-to-capture
 
 @router.post("/session/photo-frame", response_model=PhotoFrameResponse)
 async def photo_frame(session_id: str = Form(...), frame: UploadFile = File(...)):
