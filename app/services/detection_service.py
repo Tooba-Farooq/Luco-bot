@@ -24,10 +24,10 @@ landmarker_options = mp_vision.FaceLandmarkerOptions(
 )
 face_landmarker = mp_vision.FaceLandmarker.create_from_options(landmarker_options)
 
-# --- Recognition config (validated: ArcFace + opencv, see benchmark results) ---
+# --- Recognition config (validated: ArcFace + yunet, see benchmark results) ---
 FACE_RECOGNITION_MODEL = "ArcFace"
-FACE_DETECTOR_BACKEND = "opencv"
-RECOGNITION_THRESHOLD = 0.68  # from your own testing — true matches sat well under this
+FACE_DETECTOR_BACKEND = "yunet"  # DeepFace supports multiple backends, but yunet is fastest and works well for our use case
+RECOGNITION_THRESHOLD = 0.5  # was 0.68 — recalibrated against real same/different-person distances
 
 
 def _load_image(image_bytes_or_path):
@@ -140,8 +140,7 @@ def run_face_recognition(image, db: Session):
     known_people = [
         person
         for person in (
-            db.query(Employee).filter(Employee.face_embedding.isnot(None)).all()
-            + db.query(Visitor).filter(Visitor.face_embedding.isnot(None)).all()
+            db.query(Visitor).filter(Visitor.face_embedding.isnot(None)).all()
         )
         if _is_valid_embedding(person.face_embedding)
     ]

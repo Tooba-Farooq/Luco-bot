@@ -20,6 +20,7 @@ STATIC_PHRASES = {
     "ask_name": "And what's your name?",
     "ask_photo": "Perfect, let's get your photo — place your face in center of frame and look at the camera.",
     "ready_for_handoff": "Thanks — I'll let them know you're here.",
+    "ask_host_name": "Who would you like to meet?",
 }
 
 

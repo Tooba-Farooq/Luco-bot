@@ -6,7 +6,7 @@ from app.models_db import Employee
 def find_host(name_spoken: str, db: Session) -> dict:
     employees = db.query(Employee).all()
     if not employees:
-        return {"result": "NO_MATCH", "candidates": []}
+        return {"result": "NO_EMPLOYEES", "candidates": []}
 
     choices = [e.name for e in employees]
     matches = process.extract(name_spoken, choices, scorer=fuzz.WRatio, limit=5)
@@ -23,8 +23,11 @@ def find_host(name_spoken: str, db: Session) -> dict:
         return {"result": "ONE_MATCH", "employee": to_employee(strong_matches[0])}
     elif len(strong_matches) > 1:
         return {"result": "MULTIPLE_MATCHES", "candidates": [to_employee(m) for m in strong_matches]}
-    elif weak_matches:
-        return {"result": "NO_MATCH", "candidates": [to_employee(m) for m in weak_matches]}
+    elif len(weak_matches) == 1:
+            return {"result": "ONE_MATCH", "employee": to_employee(weak_matches[0])}
+    elif len(weak_matches) > 1:
+        # weak matches still get treated as a real selection scenario, not "no match"
+        return {"result": "MULTIPLE_MATCHES", "candidates": [to_employee(m) for m in weak_matches]}
     else:
-        # nothing even weakly matched — fall back to showing everyone in the directory
+        # truly nothing matched, even weakly — fall back to full directory
         return {"result": "NO_MATCH", "candidates": [to_employee((e.name, 0, 0)) for e in employees]}

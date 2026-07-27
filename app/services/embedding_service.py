@@ -1,7 +1,7 @@
 from deepface import DeepFace
 
 FACE_RECOGNITION_MODEL = "ArcFace"
-FACE_DETECTOR_BACKEND = "opencv"  # options: "opencv", "ssd", "mediapipe", "dlib", "mtcnn", "retinaface", "facenet", "deepface"
+FACE_DETECTOR_BACKEND = "yunet"  # options: "opencv", "ssd", "mediapipe", "dlib", "mtcnn", "retinaface", "facenet", "deepface"
 
 def generate_face_embedding(photo_path: str):
     """
