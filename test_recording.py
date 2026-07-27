@@ -19,7 +19,9 @@ CAPTURE_PHOTO_URL = f"{BASE_URL}/session/capture-photo"
 AUDIO_URL = f"{BASE_URL}/audio"
 
 SAMPLE_RATE = 16000
-SILENCE_THRESHOLD = 300
+SILENCE_THRESHOLD = 95  # hardcoded from this tablet's room: ambient floor ~2,
+                        # quiet-tail volumes topped out ~82, speech started ~84+
+
 SILENCE_DURATION = 1.5
 MAX_RECORD_SECONDS = 12
 OUTPUT_FILE = "test_respond.wav"

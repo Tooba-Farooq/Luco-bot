@@ -27,7 +27,12 @@ face_landmarker = mp_vision.FaceLandmarker.create_from_options(landmarker_option
 # --- Recognition config (validated: ArcFace + yunet, see benchmark results) ---
 FACE_RECOGNITION_MODEL = "ArcFace"
 FACE_DETECTOR_BACKEND = "yunet"  # DeepFace supports multiple backends, but yunet is fastest and works well for our use case
-RECOGNITION_THRESHOLD = 0.5  # was 0.68 — recalibrated against real same/different-person distances
+RECOGNITION_THRESHOLD = 0.42  # recalibrated: same-person distances topped out ~0.36,
+                              # different-person distances started ~0.499 — 0.42 sits
+                              # in that gap rather than at its edge
+MIN_MARGIN = 0.08  # best match must beat the second-best match by at least this much,
+                   # or we treat it as ambiguous (e.g. Furqan being close to both
+                   # you and your sister) rather than confidently accepting the top hit
 
 
 def _load_image(image_bytes_or_path):
@@ -108,11 +113,19 @@ def run_face_recognition(image, db: Session):
     Generates one embedding for the incoming frame (ArcFace + opencv), then compares
     it against every stored embedding (employees + known visitors) via cosine distance.
 
+    Accepts a match only if:
+      1. the best distance clears RECOGNITION_THRESHOLD, AND
+      2. the best distance beats the second-best distance by at least MIN_MARGIN
+         (guards against cases where two different people are both plausibly close,
+         e.g. one visitor's embedding sitting near-equidistant between two enrolled
+         siblings — a single-best-match check can't tell that apart from a confident hit)
+
     Returns (name: str | None, confidence: float | None).
     Returns (None, None) if:
       - opencv couldn't detect/crop a face in this frame (e.g. niqab, mask, bad angle
         at the exact recognition instant) — treated as unknown, not an error
       - no stored embedding is within threshold
+      - the top two matches are too close together to trust (ambiguous)
     """
     try:
         results = DeepFace.represent(
@@ -134,9 +147,6 @@ def run_face_recognition(image, db: Session):
     )
     incoming_embedding = largest_face["embedding"]
 
-    best_match_name = None
-    best_dist = float("inf")
-
     known_people = [
         person
         for person in (
@@ -145,17 +155,28 @@ def run_face_recognition(image, db: Session):
         if _is_valid_embedding(person.face_embedding)
     ]
 
+    best_name, best_dist = None, float("inf")
+    second_best_dist = float("inf")
+
     for person in known_people:
         dist = _cosine_distance(incoming_embedding, person.face_embedding)
         if dist < best_dist:
+            second_best_dist = best_dist
             best_dist = dist
-            best_match_name = person.name
+            best_name = person.name
+        elif dist < second_best_dist:
+            second_best_dist = dist
 
-    if best_match_name and best_dist < RECOGNITION_THRESHOLD:
-        confidence = 1 - best_dist
-        return best_match_name, confidence
+    if best_name is None or best_dist >= RECOGNITION_THRESHOLD:
+        return None, None
 
-    return None, None
+    margin = second_best_dist - best_dist
+    if margin < MIN_MARGIN:
+        # top two candidates are too close to trust — ambiguous match
+        return None, None
+
+    confidence = 1 - best_dist
+    return best_name, confidence
 
 def check_face_centered(image, face_box, x_tolerance: float = 0.15, y_tolerance: float = 0.30) -> bool:
     """
