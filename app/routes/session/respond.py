@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.services.stt_service import transcribe_best_of_two
+from app.services.stt_service import transcribe_best_of_two, transcribe_name
 from app.services.llm_service import classify_intent, answer_query
 from app.services.host_service import find_host
 from app.services.detection_state import detection_state
@@ -36,8 +36,9 @@ async def respond(
 
     try:
         if current_state == "AWAITING_NAME":
-            # force English so names come back in Roman script, not Urdu
-            stt_result = await transcribe_best_of_two(tmp_path, force_language="en")
+            # dedicated name-resolution path: races en/ur transcription, then an LLM
+            # reconciles both into one Roman-script best-guess name (see stt debugging notes)
+            stt_result = await transcribe_name(tmp_path)
         else:
             stt_result = await transcribe_best_of_two(tmp_path)
     finally:
@@ -48,8 +49,17 @@ async def respond(
 
     # --- Step 2: route based on current state ---
 
-    if current_state == "AWAITING_INTENT":
+    if current_state in ("AWAITING_INTENT", "ANYTHING_ELSE"):
         classification = await classify_intent(heard_text)
+
+        if classification["intent"] == "UNCLEAR":
+            detection_state.state = "ANYTHING_ELSE"
+            return RespondResponse(
+                session_id=session_id, state="ANYTHING_ELSE",
+                heard_text=heard_text, detected_lang=detected_lang,
+                answer_text="Sorry, I didn't quite catch that — could you say it again?",
+                audio_key="didnt_catch_that"
+            )
 
         if classification["intent"] == "MEET_SOMEONE":
             person_name = classification.get("person_name")
@@ -74,7 +84,8 @@ async def respond(
                 return RespondResponse(
                     session_id=session_id, state="FALLBACK",  # unchanged — still tells frontend what happened
                     heard_text=heard_text, detected_lang=detected_lang,
-                    answer_text="I'm not sure about that — Is there anything else I can help you with?"
+                    answer_text="I'm not sure about that — Is there anything else I can help you with?",
+                    audio_key="fallback_no_match"
                 )
             else:
                 detection_state.state = "ANYTHING_ELSE"  # CHANGED
@@ -150,14 +161,6 @@ async def respond(
             session_id=session_id, state="NAME_CONFIRMATION",
             heard_text=heard_text, detected_lang=detected_lang,
             answer_text="Is this right? Edit if needed, then submit.")
-
-    elif current_state == "ANYTHING_ELSE":
-        classification = await classify_intent(heard_text)
-        detection_state.state = "AWAITING_INTENT"
-        return RespondResponse(
-            session_id=session_id, state="AWAITING_INTENT",
-            heard_text=heard_text, detected_lang=detected_lang
-        )
 
     else:
         raise HTTPException(status_code=400, detail=f"Not expecting audio in state: {current_state}")

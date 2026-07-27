@@ -1,6 +1,6 @@
 # Lucobot Backend
 
-FastAPI backend for the reception robot — handles visitor detection, face recognition, and visitor/host interaction logic.
+FastAPI backend for the reception robot — handles visitor detection, visitor face recognition, and visitor/host interaction logic.
 
 ## Setup
 
@@ -72,6 +72,8 @@ Send a single camera frame. Call this endpoint repeatedly (every ~500ms–1s) wh
 
 **Note:** the transcript field is unified as `answer_text` for both cases, but the audio still differs: known visitors get a name-specific dynamic greeting, while unknown visitors get the shared static greeting. Name capture no longer happens at this stage; it happens later, after purpose is captured (see `/session/respond` below) — **and only for unknown visitors** (see the `AWAITING_PURPOSE` note below).
 
+Recognition at this stage is against stored **visitors only**. Employee records are not part of the live `/detect` recognition path.
+
 ### ⚠️ Stop polling once `known` or `unknown` fires
 
 `known` and `unknown` are terminal states for this endpoint — the interaction moves into the conversational flow (`/session/respond`) from here. **Unity should stop calling `/detect` at this point.** The backend also enforces this server-side — once a session starts, repeated `/detect` calls return the cached result instead of re-running recognition, but Unity should still stop polling on its end to avoid wasted requests.
@@ -108,6 +110,7 @@ Returns raw `audio/mpeg` bytes for a static, pre-cached phrase. **Unity should c
 | `ask_purpose`               | "Please tell me the purpose of your meeting?"                                 |
 | `ask_name`                  | "And what's your name?"                                                       |
 | `ready_for_handoff`         | "Thanks — I'll let them know you're here."                                    |
+| `didnt_catch_that`           | "Sorry, I didn't quite catch that — could you say it again?"                 |
 
 ## API: `/session/respond`
 
@@ -115,7 +118,9 @@ Returns raw `audio/mpeg` bytes for a static, pre-cached phrase. **Unity should c
 **Content-Type:** `multipart/form-data`
 **Fields:** `session_id` (string), `audio` (file — WAV recommended)
 
-Send a recorded audio clip of the visitor speaking. This is the main conversational endpoint — the same one is used at every step of the conversation (intent, host name, purpose, name capture). **What it does with the audio depends entirely on the session's current internal state** — Unity doesn't need to know or track this, just always send audio to this same endpoint whenever a response is expected.
+Send a recorded audio clip of the visitor speaking. This is the main conversational endpoint — the same one is used at every step of the conversation (intent, host name, purpose, and name capture). **What it does with the audio depends entirely on the session's current internal state** — Unity doesn't need to know or track this, just always send audio to this same endpoint whenever a response is expected.
+
+When the session is waiting for the visitor's name, the backend now uses a dedicated name-resolution path instead of the generic transcription path. It transcribes the clip in English and Urdu, then normalizes the result into a Roman-script name before showing the confirmation screen.
 
 ### ⚠️ How to know when to stop recording and send the audio
 
@@ -133,7 +138,7 @@ This entire behavior is Unity-side — the backend has no way to know when someo
 ```json
 {
   "session_id": "abc123",
-  "state": "state": "AWAITING_PURPOSE" | "HOST_SELECTION" | "AWAITING_NAME" | "NAME_CONFIRMATION" | "AWAITING_PHOTO" | "READY_FOR_HANDOFF" | "QUERY_ANSWERED" | "FALLBACK" | ...,
+  "state": "AWAITING_PURPOSE" | "HOST_SELECTION" | "AWAITING_NAME" | "NAME_CONFIRMATION" | "AWAITING_PHOTO" | "READY_FOR_HANDOFF" | "QUERY_ANSWERED" | "FALLBACK" | ...,
   "heard_text": "I want to meet Ahmed",
   "detected_lang": "en" | "ur",
   "answer_text": "The washroom is on the 2nd floor." | null,
@@ -161,12 +166,12 @@ Once the visitor states their purpose, the backend checks whether the original `
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `AWAITING_PURPOSE`  | Host confirmed, purpose now being asked                                                                                                                                                                                        | Play audio, then record next response                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `HOST_SELECTION`    | Host name processed — matched (1+ candidates) or unmatched with fallback suggestions/full directory (1+ candidates), or truly nothing to offer (0 candidates). `audio_key`/`answer_text` tells the visitor which case applies. | **Always show Confirm + Cancel buttons when `host_candidates` is non-empty.** If `host_candidates.length == 1`, show that single name with Confirm/Cancel — visitor taps Confirm directly. If `host_candidates.length > 1`, show all names as **tappable options** — visitor selects one, then taps Confirm (Confirm stays disabled/inactive until a selection is made). If `host_candidates` is empty, there's nothing to confirm — just play the audio and backend will return to anything else branch . |
-| `AWAITING_NAME`     | Purpose captured, unknown visitor — now asking for their name                                                                                                                                                                  | Play audio, then record next response                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `AWAITING_NAME`     | Purpose captured, unknown visitor — now asking for their name                                                                                                                                                                  | Play audio, then record next response. This response is passed through the name-specific transcription flow before the backend asks for confirmation.                                                                                                                                                                                                                                                                                                                                                     |
 | `NAME_CONFIRMATION` | Backend heard a name — visitor confirms or edits it                                                                                                                                                                            | Show name input **pre-filled with `heard_text`**, editable. Submit button calls `/session/submit-name` regardless of whether text was changed.                                                                                                                                                                                                                                                                                                                                                             |
 | `AWAITING_PHOTO`    | Name submitted — now capturing the visitor's photo                                                                                                                                                                             | Open camera view. See `/session/photo-frame` and `/session/capture-photo` below.                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `READY_FOR_HANDOFF` | Purpose (and name/photo, if unknown) fully captured                                                                                                                                                                            | _(Next steps — QR handoff / host alert — not yet built)_                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `QUERY_ANSWERED`    | General question was answered from the knowledge prompt                                                                                                                                                                        | Play `answer_text`, then continue conversation                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `FALLBACK`          | Question couldn't be answered                                                                                                                                                                                                  | Play fallback audio                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `FALLBACK`          | Question couldn't be answered                                                                                                                                                                                                  | Play fallback audio (`didnt_catch_that`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ### API: `/session/confirm-host`
 
@@ -248,7 +253,7 @@ There's no separate knowledge-base database table — office info is inlined dir
 **Method:** `POST`
 **Content-Type:** `multipart/form-data`
 
-Registers a new employee, including their face embedding for recognition. This is an admin-facing endpoint (not called by Unity) — used to onboard employees so Lucobot can recognize them at the tablet.
+Registers a new employee and stores their profile details for admin/host-directory use. This is an admin-facing endpoint (not called by Unity) — **live tablet recognition does not use employee records anymore**; the `/detect` flow matches against stored visitors only.
 
 ### Request fields
 
@@ -278,16 +283,16 @@ Registers a new employee, including their face embedding for recognition. This i
 
 The employee record is **always created**, even if a face embedding could not be generated from the uploaded photo (e.g. the photo has no clearly detectable face, poor lighting/angle, or the face is significantly covered/obscured). Registration will not fail or return an error in this case — `embedding_created` is your only signal.
 
-- **`embedding_created: true`** → Face recognition will work for this employee at the tablet. Nothing further needed.
-- **`embedding_created: false`** → **Show a warning to the admin submitting this form.** The employee record and photo were saved successfully, but Lucobot will **not** be able to visually recognize this person — they'll always be treated as an unrecognized visitor at the tablet (prompted for their name like anyone else) rather than greeted by name. Suggested warning copy for the frontend:
+- **`embedding_created: true`** → A face embedding was generated and stored with the employee record.
+- **`embedding_created: false`** → **Show a warning to the admin submitting this form.** The employee record and photo were saved successfully, but no face embedding could be generated from the uploaded photo. Suggested warning copy for the frontend:
 
-  > ⚠️ Employee saved, but no face could be detected in the uploaded photo. Ahmed Khan will not be automatically recognized by Lucobot — consider re-uploading a clearer, front-facing photo without face coverings to enable recognition.
+  > ⚠️ Employee saved, but no face could be detected in the uploaded photo. Consider re-uploading a clearer, front-facing photo without face coverings.
 
-  Don't block the admin from proceeding — this is a soft warning, not an error. The registration itself succeeded; only the recognition _capability_ is missing. If the admin wants recognition enabled, they'll need to re-submit with a different photo (there's currently no separate "update photo" endpoint — re-registering is the workaround until one exists).
+  Don't block the admin from proceeding — this is a soft warning, not an error. The registration itself succeeded; only the stored embedding is missing.
 
 ### Why this design
 
-Face recognition is treated as a bonus capability layered on top of a valid employee record, not a requirement for one — this keeps the system consistent with how it already handles unrecognized visitors elsewhere (gracefully falls back to manual identification rather than hard-failing).
+Face recognition is treated as a bonus capability layered on top of a valid visitor record, not an employee record — live recognition now resolves visitors only, and employee data stays separate for the admin/host flow.
 
 ## Troubleshooting
 
