@@ -13,6 +13,10 @@ public class VisitorDetectionHandler : MonoBehaviour
     private string lastSessionId = "";
     private Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
 
+    [Header("UI")]
+    public GameObject greetingCaptionBubble;   // the Image parent
+    public TMPro.TMP_Text greetingCaptionText; // the TMP child
+
     void OnEnable()
     {
         detectionService.OnDetectionResult += HandleResult;
@@ -49,37 +53,35 @@ public class VisitorDetectionHandler : MonoBehaviour
             case "unknown":
                 if (result.session_id == lastSessionId) return;
                 lastSessionId = result.session_id;
-                SessionManager.Instance.BeginSession(result.session_id); // ADD
-                flowManager.Session.isKnownVisitor = false; // ADD (explicit, matches Reset() default)
+                SessionManager.Instance.BeginSession(result.session_id);
+                flowManager.Session.isKnownVisitor = false;
                 detectionService.StopPolling();
-                StartCoroutine(PlayCachedOrFetchAudio(result.audio_key));
-              
+                StartCoroutine(PlayCachedOrFetchAudio(result.audio_key, result.answer_text)); // UPDATED
                 break;
 
             case "known":
                 if (result.session_id == lastSessionId) return;
                 lastSessionId = result.session_id;
-                SessionManager.Instance.BeginSession(result.session_id); // ADD
-                flowManager.Session.isKnownVisitor = true;      // ADD — while we're here, this should be set too
-                flowManager.Session.visitorName = result.visitor_name; // ADD — needed for known-visitor handoff/QR screen
+                SessionManager.Instance.BeginSession(result.session_id);
+                flowManager.Session.isKnownVisitor = true;
+                flowManager.Session.visitorName = result.visitor_name;
                 detectionService.StopPolling();
-                PlayBase64Audio(result.audio_base64);
-
+                PlayBase64Audio(result.audio_base64, result.answer_text); // UPDATED
                 break;
         }
     }
 
     // ---------- KNOWN: inline base64 audio ----------
 
-    private void PlayBase64Audio(string base64)
+    private void PlayBase64Audio(string base64, string captionText)
     {
         if (string.IsNullOrEmpty(base64)) return;
 
         byte[] audioBytes = System.Convert.FromBase64String(base64);
-        StartCoroutine(PlayAudioBytesAndAdvance(audioBytes));
+        StartCoroutine(PlayAudioBytesAndAdvance(audioBytes, captionText));
     }
 
-    private IEnumerator PlayAudioBytesAndAdvance(byte[] mp3Bytes)
+    private IEnumerator PlayAudioBytesAndAdvance(byte[] mp3Bytes, string captionText)
     {
         string tempPath = Application.temporaryCachePath + "/greeting_temp.mp3";
         System.IO.File.WriteAllBytes(tempPath, mp3Bytes);
@@ -91,20 +93,21 @@ public class VisitorDetectionHandler : MonoBehaviour
             if (www.result == UnityWebRequest.Result.Success)
             {
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
+                ShowCaption(captionText);
                 face.StartTalking(clip);
                 yield return AdvanceAfterGreeting(clip);
             }
             else
             {
                 Debug.LogWarning("Failed to decode greeting audio: " + www.error);
-                yield return AdvanceAfterGreeting(null); // still advance even if audio failed
+                yield return AdvanceAfterGreeting(null);
             }
         }
     }
 
     // ---------- UNKNOWN: fetch + cache from /audio/{key} ----------
 
-    private IEnumerator PlayCachedOrFetchAudio(string key)
+    private IEnumerator PlayCachedOrFetchAudio(string key, string captionText)
     {
         if (string.IsNullOrEmpty(key))
         {
@@ -114,6 +117,7 @@ public class VisitorDetectionHandler : MonoBehaviour
 
         if (audioCache.TryGetValue(key, out AudioClip cached))
         {
+            ShowCaption(captionText);
             face.StartTalking(cached);
             yield return AdvanceAfterGreeting(cached);
             yield break;
@@ -128,6 +132,7 @@ public class VisitorDetectionHandler : MonoBehaviour
             {
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
                 audioCache[key] = clip;
+                ShowCaption(captionText);
                 face.StartTalking(clip);
                 yield return AdvanceAfterGreeting(clip);
             }
@@ -139,12 +144,34 @@ public class VisitorDetectionHandler : MonoBehaviour
         }
     }
 
+    // ---------- Caption show/hide ----------
+
+    private void ShowCaption(string text)
+    {
+        if (greetingCaptionBubble == null || greetingCaptionText == null) return;
+        greetingCaptionText.text = text;
+        greetingCaptionBubble.SetActive(true);
+    }
+
+    private void HideCaption()
+    {
+        if (greetingCaptionBubble == null) return;
+        greetingCaptionBubble.SetActive(false);
+    }
+    //----------reset status and session id when idle----------
+    public void ResetDetectionState()
+    {
+        lastStatus = "";
+        lastSessionId = "";
+    }
+
     // ---------- Shared advance logic ----------
 
     private IEnumerator AdvanceAfterGreeting(AudioClip clip)
     {
         float waitTime = (clip != null) ? clip.length + 0.3f : 2f;
         yield return new WaitForSeconds(waitTime);
+        HideCaption();
         flowManager.GoTo(VisitorFlowState.MeetSomeone_EnterHostName);
     }
 }

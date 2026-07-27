@@ -14333,7 +14333,6 @@ MonoBehaviour:
   face: {fileID: 1902588907}
   staticQRFallback: {fileID: 2800000, guid: 2faf7364ae40bd549b200e2dd1c2ded9, type: 3}
   displayDuration: 8
-  postQRCooldown: 2
 --- !u!1 &1438098446
 GameObject:
   m_ObjectHideFlags: 0

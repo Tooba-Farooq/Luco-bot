@@ -10,15 +10,28 @@ public class ConversationScreen : MonoBehaviour
     public GameObject hostCandidatesPanel;
     public Transform hostCandidatesContainer;
     public GameObject hostCandidateButtonPrefab;
+    public Button confirmHostButton;
+    public Button cancelHostButton;
     public GameObject nameConfirmationPanel;
     public TMP_InputField nameInputField;
     public Button submitNameButton;
     public VisitorFlowManager flowManager;
 
+    private int selectedCandidateId = -1;
+    private GameObject selectedCandidateButtonObj = null;
+    private readonly Color selectedColor = new Color(0.75f, 0.85f, 1f);
+    private Color defaultCandidateColor = Color.white;
+
     void OnEnable()
     {
         SessionManager.Instance.OnSessionUpdate += HandleSessionUpdate;
-        SessionManager.Instance.OnRecordingFailed +=HandleRecordingFailed;
+        SessionManager.Instance.OnRecordingFailed += HandleRecordingFailed;
+
+        if (confirmHostButton != null)
+            confirmHostButton.onClick.AddListener(OnConfirmHost);
+        if (cancelHostButton != null)
+            cancelHostButton.onClick.AddListener(OnCancelHost);
+
         ResetScreen();
         StartListening();
     }
@@ -27,6 +40,11 @@ public class ConversationScreen : MonoBehaviour
     {
         SessionManager.Instance.OnSessionUpdate -= HandleSessionUpdate;
         SessionManager.Instance.OnRecordingFailed -= HandleRecordingFailed;
+
+        if (confirmHostButton != null)
+            confirmHostButton.onClick.RemoveListener(OnConfirmHost);
+        if (cancelHostButton != null)
+            cancelHostButton.onClick.RemoveListener(OnCancelHost);
     }
 
     void ResetScreen()
@@ -35,6 +53,17 @@ public class ConversationScreen : MonoBehaviour
         nameConfirmationPanel.SetActive(false);
         listeningIndicator.SetActive(false);
         heardText.text = "";
+        selectedCandidateId = -1;
+        selectedCandidateButtonObj = null;
+        SetConfirmCancelInteractable(false);
+    }
+
+    void SetConfirmCancelInteractable(bool interactable)
+    {
+        if (confirmHostButton != null)
+            confirmHostButton.interactable = interactable;
+        if (cancelHostButton != null)
+            cancelHostButton.interactable = interactable;
     }
 
     void StartListening()
@@ -63,15 +92,15 @@ public class ConversationScreen : MonoBehaviour
             case "AWAITING_NAME":
             case "AWAITING_HOST_NAME":
             case "AWAITING_INTENT":
-                StartListening(); // continue the conversation loop
+                StartListening();
                 break;
 
             case "QUERY_ANSWERED":
-                StartListening(); // continue after answering a general question
+                StartListening();
                 break;
 
             case "FALLBACK":
-                StartListening(); // retry listening
+                StartListening();
                 break;
 
             case "READY_FOR_HANDOFF":
@@ -80,7 +109,7 @@ public class ConversationScreen : MonoBehaviour
 
                 flowManager.GoTo(VisitorFlowState.MeetSomeone_ShowSimilarNames);
                 break;
-            
+
             case "AWAITING_PHOTO":
                 if (response.matched_host != null && flowManager.Session != null)
                     flowManager.Session.hostName = response.matched_host.name;
@@ -89,7 +118,7 @@ public class ConversationScreen : MonoBehaviour
                 break;
             default:
                 Debug.LogWarning("Unhandled session state:" + response.state);
-                heardText.text ="Sorry, I didn't understand that. Please try again.";
+                heardText.text = "Sorry, I didn't understand that. Please try again.";
                 StartListening();
                 break;
         }
@@ -98,6 +127,9 @@ public class ConversationScreen : MonoBehaviour
     void ShowHostCandidates(HostCandidate[] candidates)
     {
         hostCandidatesPanel.SetActive(true);
+        selectedCandidateId = -1;
+        selectedCandidateButtonObj = null;
+        SetConfirmCancelInteractable(false);
 
         foreach (Transform child in hostCandidatesContainer)
             Destroy(child.gameObject);
@@ -110,14 +142,48 @@ public class ConversationScreen : MonoBehaviour
             btnObj.GetComponentInChildren<TextMeshProUGUI>().text = candidate.name;
 
             int id = candidate.id;
-            btnObj.GetComponent<Button>().onClick.AddListener(() => OnCandidateSelected(id));
+            btnObj.GetComponent<Button>().onClick.AddListener(() => OnCandidateSelected(id, btnObj));
         }
     }
 
-    void OnCandidateSelected(int employeeId)
+    void OnCandidateSelected(int employeeId, GameObject btnObj)
+    {
+        if (selectedCandidateButtonObj != null)
+        {
+            var prevImage = selectedCandidateButtonObj.GetComponent<Image>();
+            if (prevImage != null) prevImage.color = defaultCandidateColor;
+        }
+
+        selectedCandidateId = employeeId;
+        selectedCandidateButtonObj = btnObj;
+
+        var image = btnObj.GetComponent<Image>();
+        if (image != null) image.color = selectedColor;
+
+        SetConfirmCancelInteractable(true);
+    }
+
+    void OnConfirmHost()
+    {
+        if (selectedCandidateId == -1)
+        {
+            Debug.LogWarning("Confirm pressed with no candidate selected.");
+            return;
+        }
+
+        hostCandidatesPanel.SetActive(false);
+        SetConfirmCancelInteractable(false);
+        SessionManager.Instance.SelectHost(selectedCandidateId);
+    }
+
+    void OnCancelHost()
     {
         hostCandidatesPanel.SetActive(false);
-        SessionManager.Instance.SelectHost(employeeId);
+        selectedCandidateId = -1;
+        selectedCandidateButtonObj = null;
+        SetConfirmCancelInteractable(false);
+        heardText.text = "";
+        StartListening();
     }
 
     void ShowNameConfirmation(string heardName)
@@ -133,7 +199,7 @@ public class ConversationScreen : MonoBehaviour
         if (string.IsNullOrEmpty(finalName))
         {
             Debug.LogWarning("Name field empty — not submitting.");
-            return; // don't let them submit blank
+            return;
         }
 
         nameConfirmationPanel.SetActive(false);
@@ -142,7 +208,6 @@ public class ConversationScreen : MonoBehaviour
 
     void HandleRecordingFailed()
     {
-        // Didn't catch anything — just listen again rather than getting stuck
         heardText.text = "Didn't catch that. Please try again.";
         StartListening();
     }

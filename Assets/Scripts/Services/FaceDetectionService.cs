@@ -13,7 +13,7 @@ public class DetectResponse
     public string session_id;
     public string audio_base64;
     public string audio_key;
-    public string greeting_text;
+    public string answer_text;
 }
 
 public class FaceDetectionService : MonoBehaviour

@@ -1,0 +1,63 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+public class ListeningIndicatorAnimator : MonoBehaviour
+{
+    [Header("Mic Icon (optional pulse)")]
+    public RectTransform micIcon;
+    public float micPulseScale = 1.15f;
+    public float micPulseSpeed = 2f;
+
+    [Header("Waveform Bars")]
+    public RectTransform[] waveformBars;
+    public float minBarHeight = 8f;
+    public float maxBarHeight = 40f;
+    public float animationSpeed = 6f;
+
+    private float[] barPhaseOffsets;
+    private float[] barSpeedMultipliers;
+
+    void OnEnable()
+    {
+        barPhaseOffsets = new float[waveformBars.Length];
+        barSpeedMultipliers = new float[waveformBars.Length];
+
+        for (int i = 0; i < waveformBars.Length; i++)
+        {
+            barPhaseOffsets[i] = Random.Range(0f, Mathf.PI * 2f);
+            barSpeedMultipliers[i] = Random.Range(0.8f, 1.4f);
+        }
+    }
+
+    void Update()
+    {
+        AnimateWaveform();
+        AnimateMicPulse();
+    }
+
+    void AnimateWaveform()
+    {
+        if (waveformBars == null) return;
+
+        for (int i = 0; i < waveformBars.Length; i++)
+        {
+            if (waveformBars[i] == null) continue;
+
+            float t = Time.time * animationSpeed * barSpeedMultipliers[i] + barPhaseOffsets[i];
+            float normalized = (Mathf.Sin(t) + Mathf.Sin(t * 1.7f + 1f)) * 0.25f + 0.5f;
+            float height = Mathf.Lerp(minBarHeight, maxBarHeight, normalized);
+
+            Vector2 size = waveformBars[i].sizeDelta;
+            size.y = height;
+            waveformBars[i].sizeDelta = size;
+        }
+    }
+
+    void AnimateMicPulse()
+    {
+        if (micIcon == null) return;
+
+        float pulse = 1f + (Mathf.Sin(Time.time * micPulseSpeed) * 0.5f + 0.5f) * (micPulseScale - 1f);
+        micIcon.localScale = new Vector3(pulse, pulse, 1f);
+    }
+}
