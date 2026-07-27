@@ -6,6 +6,7 @@ from app.services.llm_service import classify_intent, answer_query
 from app.services.host_service import find_host
 from app.services.detection_state import detection_state
 from app.services.tts_service import generate_dynamic_audio
+from app.services.session_service import persist_at_handoff
 from app.models_db import Visitor, VisitLog
 from app.models import RespondResponse
 import tempfile
@@ -137,13 +138,16 @@ async def respond(
             detection_state.visit_log_id = new_visit.id
 
             detection_state.state = "READY_FOR_HANDOFF"
+            persist_at_handoff(db)
 
-            return RespondResponse(
+            response = RespondResponse(
                 session_id=session_id, state="READY_FOR_HANDOFF",
                 heard_text=heard_text, detected_lang=detected_lang,
                 answer_text="Thanks — I'll let them know you're here.",
                 audio_key="ready_for_handoff"
             )
+            detection_state.reset()
+            return response
         else:
             detection_state.state = "AWAITING_NAME"
             return RespondResponse(

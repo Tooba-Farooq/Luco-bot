@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Text
+from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.database import Base
@@ -40,3 +41,20 @@ class VisitLog(Base):
 
     visitor = relationship("Visitor", back_populates="visits")
     host_employee = relationship("Employee", back_populates="visits")
+
+
+class VisitSession(Base):  # your existing declarative Base
+    __tablename__ = "visit_sessions"
+
+    session_id = Column(String, primary_key=True)
+    state = Column(String, nullable=False)
+
+    visitor_id = Column(Integer, nullable=True)
+    visit_log_id = Column(Integer, nullable=True)
+    selected_host_id = Column(Integer, nullable=True)
+    purpose = Column(String, nullable=True)
+    recognized_name = Column(String, nullable=True)
+
+    is_closed = Column(String, default=False, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    last_active_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

@@ -4,6 +4,7 @@ from app.database import get_db
 from app.services.detection_state import detection_state
 from app.services.detection_service import check_face_present, check_face_forward, check_face_centered, _load_image
 from app.services.embedding_service import generate_face_embedding
+from app.services.session_service import persist_at_handoff
 from app.models_db import Visitor, VisitLog
 from app.models import PhotoFrameResponse
 import os
@@ -113,10 +114,13 @@ async def capture_photo(session_id: str = Form(...), frame: UploadFile = File(..
     
     detection_state.visit_log_id = new_visit.id
     detection_state.state = "READY_FOR_HANDOFF"
+    persist_at_handoff(db)
 
-    return {
+    response = {
         "session_id": session_id,
         "state": "READY_FOR_HANDOFF",
         "answer_text": "Thanks — I'll let them know you're here.",
         "audio_key": "ready_for_handoff",
     }
+    detection_state.reset()
+    return response
