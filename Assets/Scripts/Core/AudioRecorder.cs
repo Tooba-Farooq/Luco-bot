@@ -9,7 +9,7 @@ public class AudioRecorder : MonoBehaviour
 
     [Header("Recording Settings")]
     public int sampleRate = 16000; // Whisper prefers 16kHz
-    public float silenceThreshold = 0.02f;
+    public float silenceThreshold = 0.03f;
     public float silenceDurationToStop = 1.8f;
     public float maxRecordingLength = 15f;
     public float minRecordingLength = 0.5f; // avoid sending empty/near-empty clips
@@ -59,7 +59,6 @@ public class AudioRecorder : MonoBehaviour
                 float volume = 0f;
                 foreach (float s in sampleWindow) volume += Mathf.Abs(s);
                 volume /= sampleWindow.Length;
-
                 if (volume > silenceThreshold)
                 {
                     speechDetected = true;

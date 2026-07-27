@@ -29,7 +29,6 @@ public class QRCodeScreen : MonoBehaviour
         if (face != null)
             face.SetExpression(FaceExpression.Success);
 
-        // Display-only QR — content doesn't need to be meaningful yet, per spec
         string dummyData = System.Uri.EscapeDataString($"Visit-{visitorName}-{System.DateTime.Now.Ticks}");
         string url = $"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={dummyData}";
         qrImage.texture = staticQRFallback;
@@ -58,10 +57,6 @@ public class QRCodeScreen : MonoBehaviour
     IEnumerator ReturnToIdleAfterDelay()
     {
         yield return new WaitForSeconds(displayDuration);
-        flowManager.GoTo(VisitorFlowState.Idle);
-
-        FaceDetectionService detectionService = FindAnyObjectByType<FaceDetectionService>();
-        if (detectionService != null)
-            detectionService.StartPolling(); // resume detection for the next visitor
+        flowManager.GoTo(VisitorFlowState.Idle); // this deactivates this GameObject — do nothing after this line
     }
 }

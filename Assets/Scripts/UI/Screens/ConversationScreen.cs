@@ -26,6 +26,7 @@ public class ConversationScreen : MonoBehaviour
     {
         SessionManager.Instance.OnSessionUpdate += HandleSessionUpdate;
         SessionManager.Instance.OnRecordingFailed += HandleRecordingFailed;
+        SessionManager.Instance.OnReadyToSpeak += HandleReadyToSpeak; // ADD
 
         if (confirmHostButton != null)
             confirmHostButton.onClick.AddListener(OnConfirmHost);
@@ -40,6 +41,7 @@ public class ConversationScreen : MonoBehaviour
     {
         SessionManager.Instance.OnSessionUpdate -= HandleSessionUpdate;
         SessionManager.Instance.OnRecordingFailed -= HandleRecordingFailed;
+        SessionManager.Instance.OnReadyToSpeak -= HandleReadyToSpeak; // ADD
 
         if (confirmHostButton != null)
             confirmHostButton.onClick.RemoveListener(OnConfirmHost);
@@ -68,8 +70,12 @@ public class ConversationScreen : MonoBehaviour
 
     void StartListening()
     {
-        listeningIndicator.SetActive(true);
         SessionManager.Instance.RecordAndSend();
+    }
+
+    void HandleReadyToSpeak()
+    {
+        listeningIndicator.SetActive(true);
     }
 
     void HandleSessionUpdate(SessionResponse response)
@@ -80,7 +86,6 @@ public class ConversationScreen : MonoBehaviour
         switch (response.state)
         {
             case "HOST_SELECTION":
-            case "HOST_SUGGESTIONS":
                 ShowHostCandidates(response.host_candidates);
                 break;
 
@@ -92,6 +97,7 @@ public class ConversationScreen : MonoBehaviour
             case "AWAITING_NAME":
             case "AWAITING_HOST_NAME":
             case "AWAITING_INTENT":
+            case "ANYTHING_ELSE":
                 StartListening();
                 break;
 
@@ -125,7 +131,13 @@ public class ConversationScreen : MonoBehaviour
     }
 
     void ShowHostCandidates(HostCandidate[] candidates)
-    {
+    {    if (candidates == null || candidates.Length == 0)
+        {
+            hostCandidatesPanel.SetActive(false);
+            StartListening();
+            return;
+        }
+
         hostCandidatesPanel.SetActive(true);
         selectedCandidateId = -1;
         selectedCandidateButtonObj = null;

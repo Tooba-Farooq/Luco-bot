@@ -14,8 +14,8 @@ public class VisitorDetectionHandler : MonoBehaviour
     private Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
 
     [Header("UI")]
-    public GameObject greetingCaptionBubble;   // the Image parent
-    public TMPro.TMP_Text greetingCaptionText; // the TMP child
+    public GameObject greetingCaptionBubble;
+    public TMPro.TMP_Text greetingCaptionText;
 
     void OnEnable()
     {
@@ -25,6 +25,12 @@ public class VisitorDetectionHandler : MonoBehaviour
     void OnDisable()
     {
         detectionService.OnDetectionResult -= HandleResult;
+    }
+
+    public void ResetDetectionState()
+    {
+        lastStatus = "";
+        lastSessionId = "";
     }
 
     void HandleResult(DetectResponse result)
@@ -56,7 +62,7 @@ public class VisitorDetectionHandler : MonoBehaviour
                 SessionManager.Instance.BeginSession(result.session_id);
                 flowManager.Session.isKnownVisitor = false;
                 detectionService.StopPolling();
-                StartCoroutine(PlayCachedOrFetchAudio(result.audio_key, result.answer_text)); // UPDATED
+                StartCoroutine(PlayCachedOrFetchAudio(result.audio_key, result.answer_text));
                 break;
 
             case "known":
@@ -66,7 +72,7 @@ public class VisitorDetectionHandler : MonoBehaviour
                 flowManager.Session.isKnownVisitor = true;
                 flowManager.Session.visitorName = result.visitor_name;
                 detectionService.StopPolling();
-                PlayBase64Audio(result.audio_base64, result.answer_text); // UPDATED
+                PlayBase64Audio(result.audio_base64, result.answer_text);
                 break;
         }
     }
@@ -94,13 +100,12 @@ public class VisitorDetectionHandler : MonoBehaviour
             {
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
                 ShowCaption(captionText);
-                face.StartTalking(clip);
-                yield return AdvanceAfterGreeting(clip);
+                yield return PlayAndAdvance(clip);
             }
             else
             {
                 Debug.LogWarning("Failed to decode greeting audio: " + www.error);
-                yield return AdvanceAfterGreeting(null);
+                yield return AdvanceAfterGreeting();
             }
         }
     }
@@ -111,15 +116,14 @@ public class VisitorDetectionHandler : MonoBehaviour
     {
         if (string.IsNullOrEmpty(key))
         {
-            yield return AdvanceAfterGreeting(null);
+            yield return AdvanceAfterGreeting();
             yield break;
         }
 
         if (audioCache.TryGetValue(key, out AudioClip cached))
         {
             ShowCaption(captionText);
-            face.StartTalking(cached);
-            yield return AdvanceAfterGreeting(cached);
+            yield return PlayAndAdvance(cached);
             yield break;
         }
 
@@ -133,13 +137,12 @@ public class VisitorDetectionHandler : MonoBehaviour
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
                 audioCache[key] = clip;
                 ShowCaption(captionText);
-                face.StartTalking(clip);
-                yield return AdvanceAfterGreeting(clip);
+                yield return PlayAndAdvance(clip);
             }
             else
             {
                 Debug.LogWarning("Failed to fetch audio for key '" + key + "': " + www.error);
-                yield return AdvanceAfterGreeting(null);
+                yield return AdvanceAfterGreeting();
             }
         }
     }
@@ -158,20 +161,27 @@ public class VisitorDetectionHandler : MonoBehaviour
         if (greetingCaptionBubble == null) return;
         greetingCaptionBubble.SetActive(false);
     }
-    //----------reset status and session id when idle----------
-    public void ResetDetectionState()
+
+    // ---------- Shared: play clip, wait for REAL finish, then advance ----------
+
+    private IEnumerator PlayAndAdvance(AudioClip clip)
     {
-        lastStatus = "";
-        lastSessionId = "";
+        bool finished = false;
+        System.Action handler = () => finished = true;
+        face.OnTalkingFinished += handler;
+
+        face.StartTalking(clip);
+        yield return new WaitUntil(() => finished);
+
+        face.OnTalkingFinished -= handler;
+
+        yield return AdvanceAfterGreeting();
     }
 
-    // ---------- Shared advance logic ----------
-
-    private IEnumerator AdvanceAfterGreeting(AudioClip clip)
+    private IEnumerator AdvanceAfterGreeting()
     {
-        float waitTime = (clip != null) ? clip.length + 0.3f : 2f;
-        yield return new WaitForSeconds(waitTime);
         HideCaption();
         flowManager.GoTo(VisitorFlowState.MeetSomeone_EnterHostName);
+        yield break;
     }
 }

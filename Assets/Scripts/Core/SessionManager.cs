@@ -7,10 +7,16 @@ using UnityEngine.Networking;
 public class SessionManager : MonoBehaviour
 {
     public event Action OnRecordingFailed;
+    public event Action OnReadyToSpeak; // ADD
     public static SessionManager Instance;
 
     public FaceDetectionService detectionService;
     public FaceExpressionController face;
+
+    [Header("Speak Cue")]
+    public AudioClip readyToSpeakChime;
+    public AudioSource cueAudioSource; // separate AudioSource — do not reuse face.audioSource
+    public float preListenBuffer = 0.4f;
 
     public string CurrentSessionId { get; private set; }
 
@@ -28,6 +34,18 @@ public class SessionManager : MonoBehaviour
     // Call this whenever it's the visitor's turn to speak
     public void RecordAndSend()
     {
+        StartCoroutine(RecordAndSendRoutine());
+    }
+
+    private IEnumerator RecordAndSendRoutine()
+    {
+        yield return new WaitForSeconds(preListenBuffer);
+
+        if (cueAudioSource != null && readyToSpeakChime != null)
+            cueAudioSource.PlayOneShot(readyToSpeakChime);
+
+        OnReadyToSpeak?.Invoke();
+
         AudioRecorder.Instance.StartRecording(OnAudioRecorded);
     }
 
@@ -62,7 +80,7 @@ public class SessionManager : MonoBehaviour
             else
             {
                 Debug.LogWarning("session/respond failed: " + www.error);
-                Debug.LogWarning("Response body: " + www.downloadHandler.text); // ADD — shows the real reason
+                Debug.LogWarning("Response body: " + www.downloadHandler.text);
                 OnRecordingFailed?.Invoke();
             }
         }
@@ -92,8 +110,7 @@ public class SessionManager : MonoBehaviour
             if (www.result == UnityWebRequest.Result.Success)
             {
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
-                face.StartTalking(clip);
-                yield return new WaitForSeconds(clip.length + 0.2f);
+                yield return PlayAndWaitForFinish(clip);
             }
         }
     }
@@ -102,8 +119,7 @@ public class SessionManager : MonoBehaviour
     {
         if (audioCache.TryGetValue(key, out AudioClip cached))
         {
-            face.StartTalking(cached);
-            yield return new WaitForSeconds(cached.length + 0.2f);
+            yield return PlayAndWaitForFinish(cached);
             yield break;
         }
 
@@ -115,10 +131,21 @@ public class SessionManager : MonoBehaviour
             {
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
                 audioCache[key] = clip;
-                face.StartTalking(clip);
-                yield return new WaitForSeconds(clip.length + 0.2f);
+                yield return PlayAndWaitForFinish(clip);
             }
         }
+    }
+
+    private IEnumerator PlayAndWaitForFinish(AudioClip clip)
+    {
+        bool finished = false;
+        Action handler = () => finished = true;
+        face.OnTalkingFinished += handler;
+
+        face.StartTalking(clip);
+        yield return new WaitUntil(() => finished);
+
+        face.OnTalkingFinished -= handler;
     }
 
     // ---------- Backend action calls ----------
@@ -128,14 +155,9 @@ public class SessionManager : MonoBehaviour
         StartCoroutine(PostJson("/session/confirm-host", $"{{\"session_id\":\"{CurrentSessionId}\",\"employee_id\":{employeeId}}}"));
     }
 
-    //public void RetryHostName()
-    //{
-   //     StartCoroutine(PostJson("/session/retry-host-name", $"{{\"session_id\":\"{CurrentSessionId}\"}}"));
-    //}
-
     public void SubmitName(string name)
     {
-        string safeName = name.Replace("\"", "\\\""); // basic JSON-safety for quotes in the name
+        string safeName = name.Replace("\"", "\\\"");
         StartCoroutine(PostJson("/session/submit-name", $"{{\"session_id\":\"{CurrentSessionId}\",\"name\":\"{safeName}\"}}"));
     }
 
@@ -159,6 +181,8 @@ public class SessionManager : MonoBehaviour
             else
             {
                 Debug.LogWarning($"{endpoint} failed: " + www.error);
+                Debug.LogWarning("Response body: " + www.downloadHandler.text);
+                OnRecordingFailed?.Invoke(); // ADD
             }
         }
     }
