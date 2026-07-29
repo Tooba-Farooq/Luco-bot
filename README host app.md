@@ -12,34 +12,21 @@ Employees only. They do **not** self-register — an admin creates their record 
 
 ## Auth flow (what the app needs to implement)
 
-### 1. Activation (first-time setup, once per employee)
+### Important: activation is NOT part of this app
 
-The admin gives the employee an `invite_token` (out of band — printed, told verbally, etc. — not automated yet).
+Activation (setting a password for the first time) happens on a **separate web page**, opened from a link in an email — not inside this app. The app should assume every employee who opens it already has a working `employee_code` + password. **Do not build an "activate account" screen in the app.**
+
+For reference, activation works like this (you don't need to implement this, just know it exists):
 
 ```
-POST /auth/activate
-Content-Type: application/json
-
-{
-  "invite_token": "Zdcgy-nAHNe0Nywx8ryGwS7cPcBPCqDgt5qL1cAg1qY",
-  "password": "the password they choose"
-}
+POST /auth/activate   { "invite_token": "...", "password": "..." }
 ```
 
-Response:
+This is called by the web page, not the app.
 
-```json
-{
-  "detail": "Password set. You can now log in.",
-  "employee_code": "EMP-07"
-}
-```
+**How to get test credentials during development** (until the email step is wired up): ask the backend dev for an `employee_code` + password directly — they'll create a test employee and activate it manually via Swagger. Build and test everything below against those.
 
-**Show the employee their `employee_code`** after this — that's their login username going forward, not their email or name.
-
-Invite tokens expire after 7 days. An expired or already-used token returns `400`.
-
-### 2. Login
+### 1. Login
 
 ```
 POST /auth/login
@@ -104,11 +91,10 @@ Returns `{ id, employee_code, name }`. Useful for a "logged in as \_\_\_" header
 
 ## Screens this implies
 
-1. **Activate account** — invite token + new password fields → `POST /auth/activate` → show them their `employee_code`.
-2. **Login** — `employee_code` + password → `POST /auth/login` → store tokens → `POST /auth/register-device`.
-3. **Home / idle** — mostly empty state; this is where push notifications land.
-4. **Incoming visitor alert** — _(endpoint not built yet — coming next)_ — will show visitor photo, name, purpose, with **Available Now / Notify Later / Not Available** actions.
-5. **Optional: visit history** — _(endpoint not built yet)_ — past visits to this host.
+1. **Login** — `employee_code` + password → `POST /auth/login` → store tokens → `POST /auth/register-device`. This is the first screen the app shows. There is no activation screen in the app.
+2. **Home / idle** — mostly empty state; this is where push notifications land.
+3. **Incoming visitor alert** — _(endpoint not built yet — coming next)_ — will show visitor photo, name, purpose, with **Available Now / Notify Later / Not Available** actions.
+4. **Optional: visit history** — _(endpoint not built yet)_ — past visits to this host.
 
 ---
 
