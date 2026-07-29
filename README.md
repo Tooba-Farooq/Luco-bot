@@ -281,25 +281,13 @@ Registers a new employee and stores their profile details for admin/host-directo
   "floor_room": "3rd Floor, Room 204",
   "phone_number": "0300-1234567",
   "email": "ahmed@company.com",
-  "photo_path": "employee_photos/a1b2c3d4.jpg",
-  "embedding_created": true
+   "photo_path": "employee_photos/a1b2c3d4.jpg"
 }
 ```
 
-### ⚠️ Important: check `embedding_created` on every response
-
-The employee record is **always created**, even if a face embedding could not be generated from the uploaded photo (e.g. the photo has no clearly detectable face, poor lighting/angle, or the face is significantly covered/obscured). Registration will not fail or return an error in this case — `embedding_created` is your only signal.
-
-- **`embedding_created: true`** → A face embedding was generated and stored with the employee record.
-- **`embedding_created: false`** → **Show a warning to the admin submitting this form.** The employee record and photo were saved successfully, but no face embedding could be generated from the uploaded photo. Suggested warning copy for the frontend:
-
-  > ⚠️ Employee saved, but no face could be detected in the uploaded photo. Consider re-uploading a clearer, front-facing photo without face coverings.
-
-  Don't block the admin from proceeding — this is a soft warning, not an error. The registration itself succeeded; only the stored embedding is missing.
-
 ### Why this design
 
-Face recognition is treated as a bonus capability layered on top of a valid visitor record, not an employee record — live recognition now resolves visitors only, and employee data stays separate for the admin/host flow.
+Face recognition is now focused on visitors only. Employee records are kept for host-directory and admin use, but their photos are not embedded for live recognition.
 
 ## Troubleshooting
 

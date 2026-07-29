@@ -135,7 +135,7 @@ def run_face_recognition(image, db: Session):
             enforce_detection=True
         )
     except ValueError:
-        # opencv couldn't find a face this pass — graceful fallback, not a crash
+        print("No face detected by DeepFace/yunet this frame")
         return None, None
     except Exception as e:
         print(f"Recognition embedding failed unexpectedly: {e}")
@@ -167,17 +167,17 @@ def run_face_recognition(image, db: Session):
         elif dist < second_best_dist:
             second_best_dist = dist
 
+    print(f"best={best_name}, best_dist={best_dist if best_name else 'N/A'}")
     if best_name is None or best_dist >= RECOGNITION_THRESHOLD:
+        print("Rejected: no match under threshold")
         return None, None
 
     margin = second_best_dist - best_dist
+    print(f"margin={margin:.4f}")
     if margin < MIN_MARGIN:
-        # top two candidates are too close to trust — ambiguous match
+        print("Rejected: ambiguous margin")
         return None, None
-
-    confidence = 1 - best_dist
-    return best_name, confidence
-
+    
 def check_face_centered(image, face_box, x_tolerance: float = 0.15, y_tolerance: float = 0.30) -> bool:
     """
     Returns True if the face's center is within tolerance (as a fraction

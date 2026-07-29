@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from typing import Optional
 
 
 class HostSummary(BaseModel):
@@ -18,7 +19,7 @@ class DetectionResponse(BaseModel):
     session_id: Optional[str] = None
     answer_text: Optional[str] = None
 
-from typing import Optional
+
 
 class EmployeeCreateResponse(BaseModel):
     id: int
@@ -27,7 +28,8 @@ class EmployeeCreateResponse(BaseModel):
     phone_number: Optional[str] = None
     email: Optional[str] = None
     photo_path: Optional[str] = None
-    embedding_created: bool
+    employee_code: Optional[str] = None
+    invite_token: Optional[str] = None   # remove once email delivery is wired up
 
 class RespondResponse(BaseModel):
     session_id: str
@@ -76,4 +78,20 @@ class SubmitNameResponse(BaseModel):
     answer_text: str
     audio_key: str
 
-    
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+class ActivateRequest(BaseModel):
+    invite_token: str
+    password: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class DeviceTokenRequest(BaseModel):
+    device_token: str
+    platform: str  # "ios" | "android"

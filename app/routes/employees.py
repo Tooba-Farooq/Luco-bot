@@ -16,9 +16,9 @@ def _to_employee_response(employee: Employee) -> EmployeeCreateResponse:
         phone_number=employee.phone_number,
         email=employee.email,
         photo_path=employee.photo_path,
-        embedding_created=employee.face_embedding is not None,
+        employee_code=employee.employee_code,
+        invite_token=employee.invite_token,
     )
-
 
 @router.get("/employees", response_model=list[EmployeeCreateResponse])
 async def list_employees(db: Session = Depends(get_db)):

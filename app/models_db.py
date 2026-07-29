@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Text, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -12,8 +12,15 @@ class Employee(Base):
     phone_number = Column(String, nullable=True)
     email = Column(String, nullable=True)
     photo_path = Column(String, nullable=True)
-    face_embedding = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    employee_code = Column(String, unique=True, nullable=True)
+    password_hash = Column(String, nullable=True)
+    is_active = Column(Boolean, default=False, nullable=False)
+    invite_token = Column(String, unique=True, nullable=True)
+    invite_expires_at = Column(DateTime, nullable=True)
+    device_token = Column(String, nullable=True)
+    device_platform = Column(String, nullable=True)
 
     visits = relationship("VisitLog", back_populates="host_employee")
 
@@ -55,6 +62,6 @@ class VisitSession(Base):  # your existing declarative Base
     purpose = Column(String, nullable=True)
     recognized_name = Column(String, nullable=True)
 
-    is_closed = Column(String, default=False, nullable=False)
+    is_closed = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     last_active_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

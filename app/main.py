@@ -3,7 +3,7 @@ load_dotenv()
 
 
 from fastapi import FastAPI
-from app.routes import detection, employees, audio, session
+from app.routes import detection, employees, audio, session, auth
 from app.database import engine, Base
 from contextlib import asynccontextmanager
 from app.services.tts_service import build_static_audio_cache
@@ -25,3 +25,4 @@ app.include_router(detection.router)
 app.include_router(employees.router)
 app.include_router(audio.router)
 app.include_router(session.router)
+app.include_router(auth.router)
