@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+from fastapi.staticfiles import StaticFiles
 load_dotenv()
 
 
@@ -8,9 +9,11 @@ from app.database import engine, Base
 from contextlib import asynccontextmanager
 from app.services.tts_service import build_static_audio_cache
 from app import models_db  # ensures models are registered before create_all runs
+from fastapi.staticfiles import StaticFiles
 
 
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -21,6 +24,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Reception Robot Backend", lifespan=lifespan)
+app.mount("/employee_photos", StaticFiles(directory="employee_photos"), name="employee_photos")
 app.include_router(detection.router)
 app.include_router(employees.router)
 app.include_router(audio.router)

@@ -1,56 +1,46 @@
 # Lucobot — Host App Backend Reference
 
-This document is for whoever is building the **host/employee-facing app** (the app staff use to log in, receive visitor alerts, and respond). It only covers auth and host-side endpoints. For the reception tablet / Unity frontend, see the main `README.md`.
+For whoever is building the host/employee-facing pieces. Two separate deliverables — read both sections.
 
 ---
 
-## Who uses this app
+## Deliverable 1: The mobile app
 
-Employees only. They do **not** self-register — an admin creates their record first (via the separate admin-facing `/employees` endpoint, not part of this app), then the employee activates their own account using a one-time invite token.
+Employees log in with `employee_code` + password. No signup/activation screen in the app — see Deliverable 2 for that.
 
----
-
-## Auth flow (what the app needs to implement)
-
-### Important: activation is NOT part of this app
-
-Activation (setting a password for the first time) happens on a **separate web page**, opened from a link in an email — not inside this app. The app should assume every employee who opens it already has a working `employee_code` + password. **Do not build an "activate account" screen in the app.**
-
-For reference, activation works like this (you don't need to implement this, just know it exists):
-
-```
-POST /auth/activate   { "invite_token": "...", "password": "..." }
-```
-
-This is called by the web page, not the app.
-
-**How to get test credentials during development** (until the email step is wired up): ask the backend dev for an `employee_code` + password directly — they'll create a test employee and activate it manually via Swagger. Build and test everything below against those.
-
-### 1. Login
+### Login
 
 ```
 POST /auth/login
 Content-Type: application/x-www-form-urlencoded
 
-grant_type=password&username=EMP-07&password=<their password>
+grant_type=password&username=EMP-07&password=<password>
 ```
 
-This follows the OAuth2 "password grant" shape (form-encoded, not JSON) — that's a FastAPI/OAuth2 convention, not something specific to this app. `username` = the `employee_code`.
+Form-encoded (OAuth2 convention), not JSON. `username` = `employee_code`.
 
 Response:
 
 ```json
-{
-  "access_token": "<jwt>",
-  "refresh_token": "<jwt>",
-  "token_type": "bearer"
-}
+{ "access_token": "<jwt>", "refresh_token": "<jwt>", "token_type": "bearer" }
 ```
 
-- `access_token` — short-lived (30 min). Send as `Authorization: Bearer <token>` on every authenticated request.
-- `refresh_token` — long-lived (30 days). Store securely (Keychain / Android Keystore, not plain storage).
+- `access_token` — expires in 30 min. Send as `Authorization: Bearer <token>` on every request after login.
+- `refresh_token` — expires in 30 days. Store securely (Keychain / Android Keystore).
 
-### 3. Refreshing an expired access token
+### Register device (call right after login, and again if the push token ever changes)
+
+```
+POST /auth/register-device
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{ "device_token": "<FCM or APNs token>", "platform": "ios" | "android" }
+```
+
+One device per employee — registering a new token overwrites the old one. Nothing to revoke manually on device switch.
+
+### Refresh an expired access token
 
 ```
 POST /auth/refresh
@@ -59,63 +49,96 @@ Content-Type: application/json
 { "refresh_token": "<stored refresh token>" }
 ```
 
-Returns a new `access_token`. Call this whenever a request fails with `401` due to expiry, then retry the original request.
+Returns a new `access_token`. Call on any `401`, then retry the original request.
 
-### 4. Registering for push notifications
-
-Call this right after login **and again any time the device's push token changes** (reinstall, new phone, OS-level token rotation):
-
-```
-POST /auth/register-device
-Authorization: Bearer <access_token>
-Content-Type: application/json
-
-{
-  "device_token": "<FCM or APNs token>",
-  "platform": "ios" | "android"
-}
-```
-
-Only one device token is stored per employee — registering a new one overwrites the old one. If an employee switches phones, they just log in on the new device and call this again; nothing needs to be manually revoked on the old device.
-
-### 5. Who am I
+### Who am I
 
 ```
 GET /auth/me
 Authorization: Bearer <access_token>
 ```
 
-Returns `{ id, employee_code, name }`. Useful for a "logged in as \_\_\_" header/profile screen.
+Returns `{ id, employee_code, name, photo_url }`. `photo_url` is a full URL you can load directly into an image view; `null` if no photo was uploaded at registration.
+
+### App screens
+
+1. **Login** (first screen) → `/auth/login` → store tokens → `/auth/register-device`
+2. **Home/idle** — where push alerts will land
+3. _(Not built yet)_ Incoming visitor alert screen — Available Now / Notify Later / Not Available
+4. _(Not built yet, optional)_ Visit history
+
+### Test credentials (until email is wired up)
+
+Ask the backend dev for an `employee_code` + password — they'll create and activate a test employee manually.
+
+OR
+
+Do it yourself
+
+Test flow in Swagger
+POST /employees → response now includes employee_code and invite_token. Copy the token.
+POST /auth/activate with that invite_token + a chosen password.
+POST /auth/login — note this is application/x-www-form-urlencoded (Swagger will show a form, not JSON, because of OAuth2PasswordRequestForm) — username = the employee_code, password = what you set.
+Copy access_token → click Swagger's "Authorize" button → paste it → now GET /auth/me and POST /auth/register-device should work.
 
 ---
 
-## Screens this implies
+## Deliverable 2: The activation web page
 
-1. **Login** — `employee_code` + password → `POST /auth/login` → store tokens → `POST /auth/register-device`. This is the first screen the app shows. There is no activation screen in the app.
-2. **Home / idle** — mostly empty state; this is where push notifications land.
-3. **Incoming visitor alert** — _(endpoint not built yet — coming next)_ — will show visitor photo, name, purpose, with **Available Now / Notify Later / Not Available** actions.
-4. **Optional: visit history** — _(endpoint not built yet)_ — past visits to this host.
+**Not part of the app.** A standalone page, opened from an email link, on whatever device the employee checks email on. Build in plain HTML/JS or whatever's fastest — no framework required.
+
+### What it does
+
+1. Reads `token` from the URL query string. The domain/path is entirely up to you — wherever you build and host it (Netlify, Vercel, even localhost during dev). Example shape: `<wherever-you-host-it>/activate?token=abc123`
+2. Shows a form: new password + confirm password
+3. On submit, calls:
+
+```
+POST /auth/activate
+Content-Type: application/json
+
+{ "invite_token": "<token from URL>", "password": "<entered password>" }
+```
+
+4. **Success (200):**
+
+```json
+{ "detail": "Password set. You can now log in.", "employee_code": "EMP-07" }
+```
+
+Display the `employee_code` — tell the user it's their login ID for the app.
+
+5. **Failure (400):**
+
+```json
+{ "detail": "Invalid or expired invite" }
+```
+
+Show as an error. Tokens expire after 7 days or after first use.
+
+### Requirements
+
+- Make the API base URL a config variable, not hardcoded — it'll change once we deploy.
+- **Once built and hosted (anywhere — even localhost for now), send the backend dev the base URL** (e.g. `https://yoursite.com/activate`). That's the one thing they need from you — they append `?token=...` themselves when sending invite emails.
 
 ---
 
-## Not built yet — do not implement UI expecting these to work
+## Not built yet
 
-- Push delivery of visitor alerts (device token is stored, but nothing sends to it yet)
-- Host-response endpoints (`Available` / `Not available` / `Wait`)
+- Push delivery of visitor alerts (device token is stored, nothing sends to it yet)
+- Host-response endpoints (Available / Not available / Wait)
 - Visit history endpoint
-- Password reset / "forgot password" flow
-- Admin-side UI for creating employees (that's a separate internal tool, not part of this app)
-
-This doc will be updated as those land — check back before building against anything not listed above.
+- Password reset flow
+- Admin UI for creating employees (internal tool, separate from both deliverables above)
 
 ---
 
-## Errors you should handle
+## Errors to handle
 
-| Status                           | Meaning                                                           |
-| -------------------------------- | ----------------------------------------------------------------- |
-| 400 on `/activate`               | Invalid or expired invite token                                   |
-| 401 on `/login`                  | Wrong `employee_code` or password                                 |
-| 403 on `/login`                  | Account exists but not yet activated                              |
-| 401 on any authenticated request | Access token expired or invalid → try `/auth/refresh`, then retry |
-| 401 on `/refresh`                | Refresh token itself expired → force full re-login                |
+| Status                           | Meaning                                            |
+| -------------------------------- | -------------------------------------------------- |
+| 400 on `/activate`               | Invalid or expired invite token                    |
+| 401 on `/login`                  | Wrong `employee_code` or password                  |
+| 403 on `/login`                  | Account exists but not activated yet               |
+| 401 on any authenticated request | Access token expired → call `/auth/refresh`, retry |
+| 401 on `/refresh`                | Refresh token expired → force full re-login        |

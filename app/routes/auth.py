@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -90,9 +90,15 @@ def register_device(
 
 
 @router.get("/me")
-def me(current_employee: Employee = Depends(get_current_employee)):
+def me(request: Request, current_employee: Employee = Depends(get_current_employee)):
+    photo_url = None
+    if current_employee.photo_path:
+        base_url = str(request.base_url).rstrip("/")
+        photo_url = f"{base_url}/{current_employee.photo_path}"
+
     return {
         "id": current_employee.id,
         "employee_code": current_employee.employee_code,
         "name": current_employee.name,
+        "photo_url": photo_url,
     }
