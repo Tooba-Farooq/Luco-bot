@@ -67,19 +67,18 @@ Returns `{ id, employee_code, name, photo_url }`. `photo_url` is a full URL you 
 3. _(Not built yet)_ Incoming visitor alert screen — Available Now / Notify Later / Not Available
 4. _(Not built yet, optional)_ Visit history
 
-### Test credentials (until email is wired up)
+### Getting test credentials
 
-Ask the backend dev for an `employee_code` + password — they'll create and activate a test employee manually.
+Two ways to get a working `employee_code` + password to log in with:
 
-OR
+**Real flow (email is now automated):** ask the backend dev to create an employee record with your real email address — you'll receive an actual invite email with the activation link. Open it, set a password, you're done.
 
-Do it yourself
+**Manual/Swagger flow (no email needed):**
 
-Test flow in Swagger
-POST /employees → response now includes employee_code and invite_token. Copy the token.
-POST /auth/activate with that invite_token + a chosen password.
-POST /auth/login — note this is application/x-www-form-urlencoded (Swagger will show a form, not JSON, because of OAuth2PasswordRequestForm) — username = the employee_code, password = what you set.
-Copy access_token → click Swagger's "Authorize" button → paste it → now GET /auth/me and POST /auth/register-device should work.
+1. `POST /employees` → response includes `employee_code` and `invite_token`. Copy the token.
+2. `POST /auth/activate` with that `invite_token` + a chosen password.
+3. `POST /auth/login` — note this is `application/x-www-form-urlencoded` (Swagger shows a form, not JSON, because of `OAuth2PasswordRequestForm`) — `username` = the `employee_code`, `password` = what you set.
+4. Copy `access_token` → click Swagger's "Authorize" button → paste it → now `GET /auth/me` and `POST /auth/register-device` should work.
 
 ---
 
@@ -120,13 +119,14 @@ Show as an error. Tokens expire after 7 days or after first use.
 
 - Make the API base URL a config variable, not hardcoded — it'll change once we deploy.
 - **Once built and hosted (anywhere — even localhost for now), send the backend dev the base URL** (e.g. `https://yoursite.com/activate`). That's the one thing they need from you — they append `?token=...` themselves when sending invite emails.
+- ✅ **Done — already live**, hosted, sending real emails, and confirmed landing in inbox (not spam).
 
 ---
 
 ## Not built yet
 
 - Push delivery of visitor alerts (device token is stored, nothing sends to it yet)
-- Host-response endpoints (Available / Not available / Wait)
+- Host-response endpoints (Available / Not available / Wait) — in progress, not tested yet, will be documented here once ready
 - Visit history endpoint
 - Password reset flow
 - Admin UI for creating employees (internal tool, separate from both deliverables above)
