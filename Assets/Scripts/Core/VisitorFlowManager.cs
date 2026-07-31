@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 using System.Collections;
 
 public class VisitorFlowManager : MonoBehaviour
@@ -15,7 +16,7 @@ public class VisitorFlowManager : MonoBehaviour
     [Header("Detection Resume")]
     public FaceDetectionService detectionService;
     public VisitorDetectionHandler detectionHandler;
-    public float postQRCooldown = 4f; // ADD — moved here so it survives the QR screen deactivating
+    public float postQRCooldown = 4f;
 
     void Start()
     {
@@ -24,7 +25,7 @@ public class VisitorFlowManager : MonoBehaviour
 
     public void GoTo(VisitorFlowState next)
     {
-        VisitorFlowState previous = CurrentState; // ADD
+        VisitorFlowState previous = CurrentState;
         CurrentState = next;
 
         if (uiManager != null)
@@ -36,8 +37,6 @@ public class VisitorFlowManager : MonoBehaviour
                 Session.Reset();
                 if (face != null) face.ReturnToIdle();
 
-                // ADD — resume detection here instead of inside QRCodeScreen's coroutine,
-                // since this GameObject stays active across the transition.
                 if (previous == VisitorFlowState.MeetSomeone_ShowSimilarNames)
                     StartCoroutine(ResumeDetectionAfterCooldown());
                 break;
@@ -72,7 +71,7 @@ public class VisitorFlowManager : MonoBehaviour
         }
     }
 
-    private IEnumerator ResumeDetectionAfterCooldown() // ADD
+    private IEnumerator ResumeDetectionAfterCooldown()
     {
         yield return new WaitForSeconds(postQRCooldown);
 

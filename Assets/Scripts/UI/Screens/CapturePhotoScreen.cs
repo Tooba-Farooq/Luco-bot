@@ -31,7 +31,7 @@ public class CapturePhotoScreen : MonoBehaviour
     private bool captureInFlight = false; // guards against double-firing capture-photo
 
     void OnEnable()
-    {
+    {   RobotCaptionController.Instance.SetSuppressed(true);
         if (face != null && lookAtCameraClip != null)
             face.StartTalking(lookAtCameraClip);
 
@@ -41,6 +41,7 @@ public class CapturePhotoScreen : MonoBehaviour
 
     void OnDisable()
     {
+        RobotCaptionController.Instance.SetSuppressed(false);
         StopPolling();
     }
 

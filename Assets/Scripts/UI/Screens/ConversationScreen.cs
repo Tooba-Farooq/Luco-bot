@@ -26,7 +26,8 @@ public class ConversationScreen : MonoBehaviour
     {
         SessionManager.Instance.OnSessionUpdate += HandleSessionUpdate;
         SessionManager.Instance.OnRecordingFailed += HandleRecordingFailed;
-        SessionManager.Instance.OnReadyToSpeak += HandleReadyToSpeak; // ADD
+        SessionManager.Instance.OnReadyToSpeak += HandleReadyToSpeak;
+        SessionManager.Instance.OnRobotSpeaking += HandleRobotSpeakingForIndicator;
 
         if (confirmHostButton != null)
             confirmHostButton.onClick.AddListener(OnConfirmHost);
@@ -41,7 +42,8 @@ public class ConversationScreen : MonoBehaviour
     {
         SessionManager.Instance.OnSessionUpdate -= HandleSessionUpdate;
         SessionManager.Instance.OnRecordingFailed -= HandleRecordingFailed;
-        SessionManager.Instance.OnReadyToSpeak -= HandleReadyToSpeak; // ADD
+        SessionManager.Instance.OnReadyToSpeak -= HandleReadyToSpeak;
+        SessionManager.Instance.OnRobotSpeaking -= HandleRobotSpeakingForIndicator;
 
         if (confirmHostButton != null)
             confirmHostButton.onClick.RemoveListener(OnConfirmHost);
@@ -86,6 +88,7 @@ public class ConversationScreen : MonoBehaviour
         switch (response.state)
         {
             case "HOST_SELECTION":
+            case "HOST_SUGGESTIONS":
                 ShowHostCandidates(response.host_candidates);
                 break;
 
@@ -131,7 +134,8 @@ public class ConversationScreen : MonoBehaviour
     }
 
     void ShowHostCandidates(HostCandidate[] candidates)
-    {    if (candidates == null || candidates.Length == 0)
+    {
+        if (candidates == null || candidates.Length == 0)
         {
             hostCandidatesPanel.SetActive(false);
             StartListening();
@@ -145,8 +149,6 @@ public class ConversationScreen : MonoBehaviour
 
         foreach (Transform child in hostCandidatesContainer)
             Destroy(child.gameObject);
-
-        if (candidates == null) return;
 
         foreach (var candidate in candidates)
         {
@@ -222,5 +224,10 @@ public class ConversationScreen : MonoBehaviour
     {
         heardText.text = "Didn't catch that. Please try again.";
         StartListening();
+    }
+
+    void HandleRobotSpeakingForIndicator(string text)
+    {
+        listeningIndicator.SetActive(false);
     }
 }

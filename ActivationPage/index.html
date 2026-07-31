@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activate Your Lucobot Account</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #171a21;
+    --border: #262b35;
+    --text: #e8eaed;
+    --muted: #8b93a1;
+    --accent: #4f8cff;
+    --accent-hover: #3f78e6;
+    --error: #ff6b6b;
+    --success: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    padding: 24px;
+  }
+  .card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 6px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 28px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  input[type="password"] {
+    width: 100%;
+    padding: 10px 12px;
+    background: #10131a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+  input[type="password"]:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+  .field-error {
+    font-size: 12px;
+    color: var(--error);
+    margin: -12px 0 14px;
+    min-height: 14px;
+  }
+  button {
+    width: 100%;
+    padding: 11px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  button:hover { background: var(--accent-hover); }
+  button:disabled {
+    background: #2a2f3a;
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+  .message {
+    display: none;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .message.show { display: block; }
+  .message.error {
+    background: rgba(255, 107, 107, 0.1);
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    color: var(--error);
+  }
+  .message.success {
+    background: rgba(74, 222, 128, 0.1);
+    border: 1px solid rgba(74, 222, 128, 0.3);
+    color: var(--success);
+  }
+  .message strong { display: block; margin-bottom: 4px; font-size: 15px; }
+  .no-token {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Set your password</h1>
+  <p class="subtitle" id="subtitle">Choose a password to activate your Lucobot host account.</p>
+
+  <div id="noTokenState" class="no-token" style="display:none;">
+    This activation link is missing a token. Please use the link from your invite email.
+  </div>
+
+  <form id="activateForm">
+    <label for="password">New password</label>
+    <input type="password" id="password" autocomplete="new-password" required minlength="8">
+    <div class="field-error" id="passwordError"></div>
+
+    <label for="confirmPassword">Confirm password</label>
+    <input type="password" id="confirmPassword" autocomplete="new-password" required minlength="8">
+    <div class="field-error" id="confirmError"></div>
+
+    <button type="submit" id="submitBtn">Activate account</button>
+  </form>
+
+  <div class="message" id="resultMessage"></div>
+</div>
+
+<script>
+  // Change this once the backend is deployed
+  const API_BASE_URL = "http://127.0.0.1:8000";
+
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token");
+
+  const form = document.getElementById("activateForm");
+  const noTokenState = document.getElementById("noTokenState");
+  const submitBtn = document.getElementById("submitBtn");
+  const resultMessage = document.getElementById("resultMessage");
+  const passwordInput = document.getElementById("password");
+  const confirmInput = document.getElementById("confirmPassword");
+  const passwordError = document.getElementById("passwordError");
+  const confirmError = document.getElementById("confirmError");
+
+  if (!token) {
+    form.style.display = "none";
+    noTokenState.style.display = "block";
+  }
+
+  function showMessage(type, title, body) {
+    resultMessage.className = "message show " + type;
+    resultMessage.innerHTML = `<strong>${title}</strong>${body}`;
+  }
+
+  function clearFieldErrors() {
+    passwordError.textContent = "";
+    confirmError.textContent = "";
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearFieldErrors();
+    resultMessage.className = "message";
+
+    const password = passwordInput.value;
+    const confirmPassword = confirmInput.value;
+
+    let hasError = false;
+    if (password.length < 8) {
+      passwordError.textContent = "Password must be at least 8 characters.";
+      hasError = true;
+    }
+    if (password !== confirmPassword) {
+      confirmError.textContent = "Passwords do not match.";
+      hasError = true;
+    }
+    if (hasError) return;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Activating…";
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/activate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invite_token: token, password })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        form.style.display = "none";
+        showMessage(
+          "success",
+          "Account activated",
+          `${data.detail || "Password set. You can now log in."}<br><br>
+           Your login ID for the Lucobot app is: <strong style="color:var(--success)">${data.employee_code}</strong>`
+        );
+      } else {
+        showMessage(
+          "error",
+          "Activation failed",
+          data.detail || "Invalid or expired invite link."
+        );
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Activate account";
+      }
+    } catch (err) {
+      showMessage(
+        "error",
+        "Something went wrong",
+        "Couldn't reach the server. Check your connection and try again."
+      );
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Activate account";
+    }
+  });
+</script>
+
+</body>
+</html>

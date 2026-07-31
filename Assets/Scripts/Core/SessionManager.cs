@@ -7,7 +7,9 @@ using UnityEngine.Networking;
 public class SessionManager : MonoBehaviour
 {
     public event Action OnRecordingFailed;
-    public event Action OnReadyToSpeak; // ADD
+    public event Action OnReadyToSpeak;
+    public event Action<string> OnRobotSpeaking; // fires with the text the robot is about to say
+    public event Action OnRobotFinishedSpeaking; // fires when that audio actually finishes
     public static SessionManager Instance;
 
     public FaceDetectionService detectionService;
@@ -15,7 +17,7 @@ public class SessionManager : MonoBehaviour
 
     [Header("Speak Cue")]
     public AudioClip readyToSpeakChime;
-    public AudioSource cueAudioSource; // separate AudioSource — do not reuse face.audioSource
+    public AudioSource cueAudioSource;
     public float preListenBuffer = 0.4f;
 
     public string CurrentSessionId { get; private set; }
@@ -91,15 +93,15 @@ public class SessionManager : MonoBehaviour
         if (!string.IsNullOrEmpty(response.audio_base64))
         {
             byte[] bytes = Convert.FromBase64String(response.audio_base64);
-            yield return PlayBytes(bytes);
+            yield return PlayBytes(bytes, response.answer_text);
         }
         else if (!string.IsNullOrEmpty(response.audio_key))
         {
-            yield return PlayCachedOrFetch(response.audio_key);
+            yield return PlayCachedOrFetch(response.audio_key, response.answer_text);
         }
     }
 
-    private IEnumerator PlayBytes(byte[] mp3Bytes)
+    private IEnumerator PlayBytes(byte[] mp3Bytes, string captionText)
     {
         string tempPath = Application.temporaryCachePath + "/session_temp.mp3";
         System.IO.File.WriteAllBytes(tempPath, mp3Bytes);
@@ -110,16 +112,16 @@ public class SessionManager : MonoBehaviour
             if (www.result == UnityWebRequest.Result.Success)
             {
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
-                yield return PlayAndWaitForFinish(clip);
+                yield return PlayAndWaitForFinish(clip, captionText);
             }
         }
     }
 
-    private IEnumerator PlayCachedOrFetch(string key)
+    private IEnumerator PlayCachedOrFetch(string key, string captionText)
     {
         if (audioCache.TryGetValue(key, out AudioClip cached))
         {
-            yield return PlayAndWaitForFinish(cached);
+            yield return PlayAndWaitForFinish(cached, captionText);
             yield break;
         }
 
@@ -131,13 +133,16 @@ public class SessionManager : MonoBehaviour
             {
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
                 audioCache[key] = clip;
-                yield return PlayAndWaitForFinish(clip);
+                yield return PlayAndWaitForFinish(clip, captionText);
             }
         }
     }
 
-    private IEnumerator PlayAndWaitForFinish(AudioClip clip)
+    private IEnumerator PlayAndWaitForFinish(AudioClip clip, string captionText = null)
     {
+        if (!string.IsNullOrEmpty(captionText))
+            OnRobotSpeaking?.Invoke(captionText);
+
         bool finished = false;
         Action handler = () => finished = true;
         face.OnTalkingFinished += handler;
@@ -146,6 +151,7 @@ public class SessionManager : MonoBehaviour
         yield return new WaitUntil(() => finished);
 
         face.OnTalkingFinished -= handler;
+        OnRobotFinishedSpeaking?.Invoke();
     }
 
     // ---------- Backend action calls ----------
@@ -182,7 +188,7 @@ public class SessionManager : MonoBehaviour
             {
                 Debug.LogWarning($"{endpoint} failed: " + www.error);
                 Debug.LogWarning("Response body: " + www.downloadHandler.text);
-                OnRecordingFailed?.Invoke(); // ADD
+                OnRecordingFailed?.Invoke();
             }
         }
     }
