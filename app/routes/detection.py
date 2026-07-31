@@ -2,7 +2,6 @@ from fastapi import APIRouter, UploadFile, File, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import DetectionResponse
-from app.models_db import Visitor
 from app.services.detection_service import check_face_present, check_face_forward, run_face_recognition, _load_image
 from app.services.detection_state import detection_state
 from app.services.tts_service import generate_dynamic_audio
@@ -51,14 +50,13 @@ async def detect(frame: UploadFile = File(...), db: Session = Depends(get_db)):
         return DetectionResponse(status="detecting", face_forward=is_forward, forward_duration=duration)
 
     # STEP 3: only now run face recognition (expensive) — pass decoded image + db
-    name, confidence = run_face_recognition(image, db)
-    status = "known" if name else "unknown"
+    visitor_id, name, confidence = run_face_recognition(image, db)
+    status = "known" if visitor_id else "unknown"
     session_id = detection_state.start_session()
 
     if status == "known":
         detection_state.recognized_name = name
-        matched_visitor = db.query(Visitor).filter(Visitor.name == name).order_by(Visitor.id.desc()).first()
-        detection_state.visitor_id = matched_visitor.id if matched_visitor else None
+        detection_state.visitor_id = visitor_id
         audio_base64, greeting_text = await generate_dynamic_audio(f"Hi {name}! How may I help you?", lang="ur")
         return DetectionResponse(
             status=status, session_id=session_id, visitor_name=name, confidence=confidence,

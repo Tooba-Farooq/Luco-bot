@@ -81,19 +81,20 @@ async def respond(
             answer = await answer_query(heard_text)
 
             if answer == "NO_MATCH":
-                detection_state.state = "ANYTHING_ELSE"  # CHANGED: backend now expects the follow-up
+                detection_state.state = "ANYTHING_ELSE"
                 return RespondResponse(
-                    session_id=session_id, state="FALLBACK",  # unchanged — still tells frontend what happened
+                    session_id=session_id, state="FALLBACK",
                     heard_text=heard_text, detected_lang=detected_lang,
                     answer_text="I'm not sure about that — Is there anything else I can help you with?",
                     audio_key="fallback_no_match"
                 )
             else:
-                detection_state.state = "ANYTHING_ELSE"  # CHANGED
+                detection_state.state = "ANYTHING_ELSE"
+                audio_base64, _ = await generate_dynamic_audio(answer)
                 return RespondResponse(
                     session_id=session_id, state="QUERY_ANSWERED",
                     heard_text=heard_text, detected_lang=detected_lang,
-                    answer_text=answer
+                    answer_text=answer, audio_base64=audio_base64
                 )
             
     elif current_state == "AWAITING_HOST_NAME":
@@ -103,29 +104,8 @@ async def respond(
     elif current_state == "AWAITING_PURPOSE":
         detection_state.purpose = heard_text
 
-        if detection_state.recognized_name:
-            if detection_state.visitor_id is None:
-                matched_visitor = (
-                    db.query(Visitor)
-                    .filter(Visitor.name == detection_state.recognized_name)
-                    .order_by(Visitor.id.desc())
-                    .first()
-                )
-                if matched_visitor:
-                    detection_state.visitor_id = matched_visitor.id
-                else:
-                    new_visitor = Visitor(
-                        name=detection_state.recognized_name,
-                        face_embedding=None,
-                        photo_path=None,
-                    )
-                    db.add(new_visitor)
-                    db.commit()
-                    db.refresh(new_visitor)
-                    detection_state.visitor_id = new_visitor.id
-
-            # known visitor — find their existing Visitor/Employee record, or create
-            # a lightweight VisitLog tied to them directly
+        if detection_state.visitor_id:
+            # known visitor — /detect already resolved and stored this visitor_id
             new_visit = VisitLog(
                 visitor_id=detection_state.visitor_id,  # however you're tracking known-visitor identity
                 host_employee_id=detection_state.selected_host_id,

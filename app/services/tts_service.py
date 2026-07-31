@@ -21,7 +21,7 @@ STATIC_PHRASES = {
     "ask_photo": "Perfect, let's get your photo — place your face in center of frame and look at the camera.",
     "ready_for_handoff": "Thanks — I'll let them know you're here.",
     "ask_host_name": "Who would you like to meet?",
-    "fall_back_no_match": "I'm not sure about that — Is there anything else I can help you with?",
+    "fallback_no_match": "I'm not sure about that — Is there anything else I can help you with?",
     "didnt_catch_that": "Sorry, I didn't quite catch that — could you say it again?",
 }
 

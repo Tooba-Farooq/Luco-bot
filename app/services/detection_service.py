@@ -120,7 +120,7 @@ def run_face_recognition(image, db: Session):
          e.g. one visitor's embedding sitting near-equidistant between two enrolled
          siblings — a single-best-match check can't tell that apart from a confident hit)
 
-    Returns (name: str | None, confidence: float | None).
+    Returns (visitor_id: int | None, name: str | None).
     Returns (None, None) if:
       - opencv couldn't detect/crop a face in this frame (e.g. niqab, mask, bad angle
         at the exact recognition instant) — treated as unknown, not an error
@@ -155,7 +155,7 @@ def run_face_recognition(image, db: Session):
         if _is_valid_embedding(person.face_embedding)
     ]
 
-    best_name, best_dist = None, float("inf")
+    best_person, best_dist = None, float("inf")
     second_best_dist = float("inf")
 
     for person in known_people:
@@ -163,20 +163,23 @@ def run_face_recognition(image, db: Session):
         if dist < best_dist:
             second_best_dist = best_dist
             best_dist = dist
-            best_name = person.name
+            best_person = person
         elif dist < second_best_dist:
             second_best_dist = dist
 
-    print(f"best={best_name}, best_dist={best_dist if best_name else 'N/A'}")
-    if best_name is None or best_dist >= RECOGNITION_THRESHOLD:
+    print(f"best={best_person.name if best_person else 'N/A'}, best_dist={best_dist if best_person else 'N/A'}")
+    if best_person is None or best_dist >= RECOGNITION_THRESHOLD:
         print("Rejected: no match under threshold")
-        return None, None
+        return None, None, None
 
     margin = second_best_dist - best_dist
     print(f"margin={margin:.4f}")
     if margin < MIN_MARGIN:
         print("Rejected: ambiguous margin")
-        return None, None
+        return None, None, None
+
+    confidence = 1 - best_dist
+    return best_person.id, best_person.name, confidence
     
 def check_face_centered(image, face_box, x_tolerance: float = 0.15, y_tolerance: float = 0.30) -> bool:
     """
