@@ -95,3 +95,7 @@ class RefreshRequest(BaseModel):
 class DeviceTokenRequest(BaseModel):
     device_token: str
     platform: str  # "ios" | "android"
+
+class HostRespondRequest(BaseModel):
+    session_id: str
+    response: str  # "available" | "not_available" | "wait"

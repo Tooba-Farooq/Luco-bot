@@ -35,6 +35,8 @@ class Visitor(Base):
 
     visits = relationship("VisitLog", back_populates="visitor")
 
+    
+
 
 class VisitLog(Base):
     __tablename__ = "visit_logs"
@@ -65,3 +67,10 @@ class VisitSession(Base):  # your existing declarative Base
     is_closed = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     last_active_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # --- host-alert flow ---
+    host_alert_sent_at = Column(DateTime, nullable=True)
+    host_response = Column(String, nullable=True)       # "available" | "not_available" | "wait" | null
+    visitor_choice = Column(String, nullable=True)       # "wait" | "message" | "cancel" | null
+    message_text = Column(Text, nullable=True)
+    status_token = Column(String, unique=True, nullable=True)  # public token for visitor's status page/socket
