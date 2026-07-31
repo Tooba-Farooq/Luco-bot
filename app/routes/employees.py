@@ -1,9 +1,10 @@
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.models_db import Employee
 from app.database import get_db
 from app.models import EmployeeCreateResponse
 from app.services.employee_service import create_employee_record
+from app.services.email_service import send_invite_email
 
 router = APIRouter()
 
@@ -28,6 +29,7 @@ async def list_employees(db: Session = Depends(get_db)):
 
 @router.post("/employees", response_model=EmployeeCreateResponse)
 async def create_employee(
+    background_tasks: BackgroundTasks,
     name: str = Form(...),
     floor_room: str = Form(None),
     phone_number: str = Form(None),
@@ -38,16 +40,16 @@ async def create_employee(
     photo_bytes = await photo.read()
 
     employee, error = create_employee_record(
-        db=db,
-        name=name,
-        floor_room=floor_room,
-        phone_number=phone_number,
-        email=email,
-        photo_bytes=photo_bytes,
-        original_filename=photo.filename
+        db=db, name=name, floor_room=floor_room, phone_number=phone_number,
+        email=email, photo_bytes=photo_bytes, original_filename=photo.filename
     )
 
     if error:
         raise HTTPException(status_code=400, detail=error)
+
+    if employee.email and employee.invite_token:
+        background_tasks.add_task(
+            send_invite_email, employee.email, employee.name, employee.invite_token
+        )
 
     return _to_employee_response(employee)

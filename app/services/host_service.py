@@ -12,7 +12,7 @@ def find_host(name_spoken: str, db: Session) -> dict:
     matches = process.extract(name_spoken, choices, scorer=fuzz.WRatio, limit=5)
 
     strong_matches = [m for m in matches if m[1] > 85]
-    weak_matches = [m for m in matches if m[1] > 60]
+    weak_matches = [m for m in matches if m[1] > 40]
 
     def to_employee(match):
         name = match[0]
