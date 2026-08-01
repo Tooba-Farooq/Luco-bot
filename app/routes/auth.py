@@ -91,7 +91,7 @@ def register_device(
 @router.get("/me/device-status")  # TEMP — remove after push testing is confirmed working
 def device_status(current_employee: Employee = Depends(get_current_employee)):
     return {
-        "device_registered": bool(current_employee.device_token),
+        "device_registered": current_employee.device_token,
         "platform": current_employee.device_platform,
     }
 
