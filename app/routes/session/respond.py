@@ -118,7 +118,7 @@ async def respond(
             detection_state.visit_log_id = new_visit.id
 
             detection_state.state = "READY_FOR_HANDOFF"
-            persist_at_handoff(db)
+            await persist_at_handoff(db)
 
             response = RespondResponse(
                 session_id=session_id, state="READY_FOR_HANDOFF",

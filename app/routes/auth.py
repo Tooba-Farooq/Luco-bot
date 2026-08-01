@@ -88,6 +88,13 @@ def register_device(
     db.commit()
     return {"detail": "Device registered"}
 
+@router.get("/me/device-status")  # TEMP — remove after push testing is confirmed working
+def device_status(current_employee: Employee = Depends(get_current_employee)):
+    return {
+        "device_registered": bool(current_employee.device_token),
+        "platform": current_employee.device_platform,
+    }
+
 
 @router.get("/me")
 def me(request: Request, current_employee: Employee = Depends(get_current_employee)):

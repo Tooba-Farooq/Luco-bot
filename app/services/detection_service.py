@@ -27,7 +27,7 @@ face_landmarker = mp_vision.FaceLandmarker.create_from_options(landmarker_option
 # --- Recognition config (validated: ArcFace + yunet, see benchmark results) ---
 FACE_RECOGNITION_MODEL = "ArcFace"
 FACE_DETECTOR_BACKEND = "yunet"  # DeepFace supports multiple backends, but yunet is fastest and works well for our use case
-RECOGNITION_THRESHOLD = 0.42  # recalibrated: same-person distances topped out ~0.36,
+RECOGNITION_THRESHOLD = 0.68  # recalibrated: same-person distances topped out ~0.36,
                               # different-person distances started ~0.499 — 0.42 sits
                               # in that gap rather than at its edge
 MIN_MARGIN = 0.08  # best match must beat the second-best match by at least this much,
@@ -136,10 +136,10 @@ def run_face_recognition(image, db: Session):
         )
     except ValueError:
         print("No face detected by DeepFace/yunet this frame")
-        return None, None
+        return None, None, None
     except Exception as e:
         print(f"Recognition embedding failed unexpectedly: {e}")
-        return None, None
+        return None, None, None
 
     largest_face = max(
         results,

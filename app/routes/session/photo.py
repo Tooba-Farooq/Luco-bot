@@ -114,7 +114,7 @@ async def capture_photo(session_id: str = Form(...), frame: UploadFile = File(..
     
     detection_state.visit_log_id = new_visit.id
     detection_state.state = "READY_FOR_HANDOFF"
-    persist_at_handoff(db)
+    await persist_at_handoff(db)
 
     response = {
         "session_id": session_id,

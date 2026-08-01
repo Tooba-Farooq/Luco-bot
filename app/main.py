@@ -38,6 +38,7 @@ app.add_middleware(
 )
 
 app.mount("/employee_photos", StaticFiles(directory="employee_photos"), name="employee_photos")
+app.mount("/visitor_photos", StaticFiles(directory="visitor_photos"), name="visitor_photos")
 
 app.include_router(detection.router)
 app.include_router(employees.router)
