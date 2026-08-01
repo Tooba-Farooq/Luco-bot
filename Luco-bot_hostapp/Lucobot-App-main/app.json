@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.lucobot.admin",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0a0a1a",
         "foregroundImage": "./assets/images/icon.jpeg"
@@ -40,7 +41,8 @@
       ],
       "expo-secure-store",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-notifications"
     ],
     "updates": {
       "enabled": true,

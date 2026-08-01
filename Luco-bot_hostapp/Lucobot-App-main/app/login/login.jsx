@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import React, { useEffect, useRef, useState } from 'react';
 import { login, registerDevice } from '../api/client';
+import * as Notifications from 'expo-notifications';
 import {
     Alert,
     Animated,
@@ -75,6 +76,15 @@ export default function Login({ goToHome }) {
     useEffect(() => {
         blinkEyes();
     }, []);
+    
+    async function getPushToken() {
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') {
+    throw new Error('Push notification permission denied');
+  }
+  const tokenData = await Notifications.getDevicePushTokenAsync();
+  return tokenData.data;
+}
 
    const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -88,9 +98,8 @@ export default function Login({ goToHome }) {
         await login(username.trim(), password.trim());
 
         // Register device right after login, per spec.
-        // Placeholder token for now — real push token comes later.
-        await registerDevice('placeholder-device-token', Platform.OS);
-
+        const pushToken = await getPushToken();
+await registerDevice(pushToken, Platform.OS);
         goToHome();
     } catch (error) {
         Alert.alert('Login Failed', error.message || 'Invalid credentials');
