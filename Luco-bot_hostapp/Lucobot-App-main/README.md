@@ -1,296 +1,72 @@
-# LucoBot Mobile App
+# Host App — Deliverable 1 (Mobile Login/Auth) — README
 
-A React Native mobile application built with Expo for the LucoBot robot system. This app serves as an **Admin Portal for Faculty Members** to manage appointment requests from visitors.
+## What's done
 
-## Project Overview
+The mobile app (React Native / Expo) now implements the full auth flow from the backend spec:
 
-### Functionalities
-- 🔐 **User Authentication**: Faculty login using Employee ID or email
-- 📋 **Appointment Management**: View all pending, approved, and declined appointment requests
-- ✅ **Real-time Approvals**: Accept or decline visitor appointments with instant updates
-- 🔔 **Live Notifications**: Receive real-time notifications when new appointment requests arrive
-- 🖼️ **Visitor Photos**: View visitor photos (if consent was given) when reviewing appointments
-- 🗑️ **History Management**: Remove completed appointments from the list
-- 🔄 **Socket.io Integration**: Real-time bidirectional communication with the backend
+- **Login** — `POST /auth/login`, form-urlencoded (`grant_type=password&username=<employee_code>&password=<password>`)
+- **Token storage** — `access_token` + `refresh_token` stored securely via `expo-secure-store` (Keychain/Keystore), not plain storage
+- **Device registration** — `POST /auth/register-device`, fired automatically right after login succeeds
+- **Auto-refresh on 401** — any authenticated request that gets a `401` automatically calls `POST /auth/refresh`, updates the stored access token, and retries once. If the refresh token itself is dead, the app logs out and returns to the login screen automatically
+- **Profile fetch** — `GET /auth/me` called on the home screen; shows employee name, code, and photo (or a placeholder initial if no photo)
+- **Logout** — clears stored tokens, returns to login
+- **Error handling** — login distinguishes `401` (wrong credentials) from `403` (account not yet activated) with different messages
 
-### Tech Stack
-- **Frontend**: React Native with Expo SDK 54
-- **UI Components**: Expo Vector Icons, React Native Reanimated
-- **Real-time Communication**: Socket.io Client
-- **Backend**: Node.js with Express
-- **Database**: PostgreSQL (hosted on NeonDB)
-- **API**: RESTful endpoints + WebSocket
+## What's NOT done (blocked, not forgotten)
 
----
+- Incoming visitor alert screen (Available Now / Notify Later / Not Available) — spec doc says the backend endpoints for this are "in progress, not tested yet"
+- Visit history screen — optional, no endpoint provided yet
+- Real push notifications — `register-device` currently sends a placeholder device token string, not a real FCM/APNs token
 
-## Prerequisites
+## Files changed
 
-- Node.js (v16 or higher)
-- npm or yarn
-- Expo CLI (optional, can use npx)
-- Android/iOS device or emulator
+- `app/api/client.js` — **new file**. All auth/API logic lives here: `login()`, `registerDevice()`, `refreshAccessToken()`, `getMe()`, `authFetch()` (the auto-refresh wrapper), `logout()`
+- `app/login/login.jsx` — `handleLogin` rewritten to use `client.js`; UI/styling untouched
+- `app/home-screen/home.jsx` — rewritten from scratch. Old version was built against a different backend entirely (Socket.io + `/api/appointments/:id` for a different appointment-based flow) — that's all removed. New version just shows the logged-in employee's profile via `getMe()` plus a logout button
+- `App.jsx` — one-line change: `<Home logout={logout} currentUser={currentUser} />` → `<Home goToLogin={logout} />`
 
----
+## How to test it yourself
 
-## Local Development Setup
-
-### 1. Install Dependencies
-
-```bash
+**1. Get the project running**
+```powershell
 npm install
 ```
-
-### 2. Backend Setup
-
-The mobile app requires a Node.js backend to function. See `lucobot-backend/` folder for backend setup instructions.
-
-**For local development:**
-
-```bash
-cd lucobot-backend
-npm install
+If you hit a `babel-preset-expo` version mismatch warning, fix it with:
+```powershell
+npx expo install babel-preset-expo
 ```
+(always use `npx expo install`, not plain `npm install`, for Expo-related packages — it picks the version matching our SDK)
 
-Create `.env` file in `lucobot-backend/`:
-```env
-PORT=3000
-DATABASE_URL=postgresql://username:password@host/database?sslmode=require
+**2. Point it at the backend**
+
+Create/edit `.env` in the project root:
 ```
-
-Start the backend:
-```bash
-npm start
+EXPO_PUBLIC_SERVER_URL=http://<backend-address>:<port>
 ```
+- If backend is running on your own machine and you're testing on the same Wi-Fi via Expo Go → use your machine's LAN IP (`ipconfig` → IPv4 Address), not `localhost`
+- If testing an APK build → needs a stable public URL (we used ngrok on this end — ask if you want the current tunnel URL, or set up your own with `ngrok http 8000`)
 
-The backend will run on `http://localhost:3000`
+**3. Get test credentials**
 
-### 3. Mobile App Configuration
+Either ask the backend dev to create+activate an employee for your email, or do it yourself via Swagger:
+1. `POST /employees` → copy `employee_code` + `invite_token`
+2. `POST /auth/activate` with that token + a password you choose
+3. Use that `employee_code` + password to log into the app
 
-Create a `.env` file in the root directory:
-
-```env
-# For local development
-EXPO_PUBLIC_SERVER_URL=http://localhost:3000
-
-# For production (after backend deployment)
-# EXPO_PUBLIC_SERVER_URL=https://your-backend-url.onrender.com
+**4. Run it**
+```powershell
+npx expo start
 ```
-
-See `env.example` for template and detailed instructions.
-
----
-
-## Running the Application
-
-### Start Mobile App
-
-```bash
-npm start
-```
-
-Or use platform-specific commands:
-
-```bash
-npm run android    # Android emulator/device
-npm run ios        # iOS simulator/device (macOS only)
-npm run web        # Web browser
-```
-
-Scan the QR code with **Expo Go** app on your mobile device, or press the corresponding key to open in emulator/simulator.
-
----
-
-## Project Structure
-
-```
-├── app/                          # Application screens
-│   ├── home-screen/             # Appointment management UI
-│   ├── login/                   # Faculty login screen
-│   └── Splash-screen/           # App splash screen
-├── components/                   # Reusable UI components
-├── constants/                    # App constants and theme
-├── lucobot-backend/             # Node.js backend
-│   ├── server.js                # Express + Socket.io server
-│   ├── package.json             # Backend dependencies
-│   ├── database_postgres.sql    # PostgreSQL schema
-│   └── env.example              # Backend environment template
-├── package.json                 # Mobile app dependencies
-├── env.example                  # Mobile app environment template
-├── README.md                    # This file
-└── DEPLOYMENT_GUIDE.md          # Production deployment instructions
-```
-
----
-
-## Backend API Endpoints
-
-The backend provides the following endpoints:
-
-### Authentication
-- `POST /api/login` - Faculty login
-
-### Appointments
-- `GET /api/appointments/:employeeId` - Get all appointments for a faculty member
-- `POST /api/appointments/create` - Create new appointment (from tablet)
-- `PUT /api/appointments/:appointmentId/approve` - Approve an appointment
-- `PUT /api/appointments/:appointmentId/reject` - Reject an appointment
-- `DELETE /api/appointments/:appointmentId` - Delete an appointment
-
-### Search
-- `POST /api/search_employee` - Fuzzy search for employees (from tablet)
-
-### Health Check
-- `GET /api/health` - Server status and features
-
----
-
-## Database Schema
-
-The database includes:
-
-### Tables
-- **`employees`** - Faculty members with authentication credentials
-  - employee_id (Primary Key)
-  - name, email, password_hash
-  - department, designation, phone
-  - is_active, created_at, updated_at
-
-- **`appointment_requests`** - Visitor appointment requests
-  - id (Primary Key)
-  - employee_id (Foreign Key)
-  - student_name, preferred_date, preferred_time
-  - purpose, visitor_image
-  - status (pending, approved, rejected)
-  - created_at, updated_at
-
-See `lucobot-backend/database_postgres.sql` for complete schema.
-
----
-
-## Features in Detail
-
-### Faculty Authentication
-- Login with Employee ID or email
-- Session management
-- Demo password: `admin123` (for development)
-
-### Appointment Management
-- Real-time updates via Socket.io
-- Sort by status (pending first, then approved)
-- Filtered view (rejected appointments automatically removed)
-- Visual status indicators (pending, approved, declined)
-
-### Visitor Photos
-- Base64 image support
-- Photo consent workflow
-- Image display in appointment details modal
-
-### Real-time Notifications
-- New appointment toast notifications
-- Socket.io room-based targeting
-- Automatic reconnection on app resume
-
----
-
-## Environment Variables
-
-### Mobile App (Root `.env`)
-
-```env
-# Backend Server URL
-EXPO_PUBLIC_SERVER_URL=http://localhost:3000
-```
-
-### Backend (`lucobot-backend/.env`)
-
-```env
-# Server Port (auto-set by hosting platforms)
-PORT=3000
-
-# Database Connection (from NeonDB)
-DATABASE_URL=postgresql://username:password@host/database?sslmode=require
-```
-
-See `env.example` files for detailed instructions and examples.
-
----
-
-## Development Tips
-
-### Testing Backend Locally
-
-```bash
-# Test health endpoint
-curl http://localhost:3000/api/health
-
-# Test login
-curl -X POST http://localhost:3000/api/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "EMP001", "password": "admin123"}'
-```
-
-### Default Credentials
-
-For testing, use:
-- **Employee ID**: `EMP001` (or any from database)
-- **Email**: `john.smith@university.edu`
-- **Password**: `admin123`
-
-See `lucobot-backend/database_postgres.sql` for all seeded employees.
-
----
-
-## Troubleshooting
-
-### Backend Connection Issues
-- Verify backend is running on `http://localhost:3000`
-- Check `EXPO_PUBLIC_SERVER_URL` in `.env` file
-- Ensure no firewall blocking connections
-- Check backend logs for errors
-
-### Socket.io Not Connecting
-- Ensure backend is running and Socket.io is initialized
-- Check browser console for connection errors
-- Verify CORS is enabled in backend (already configured)
-
-### Database Connection Failed
-- Verify `DATABASE_URL` in backend `.env`
-- Check NeonDB dashboard for database status
-- Ensure SSL mode is included: `?sslmode=require`
-
----
-
-## Production Deployment
-
-For deploying the backend to production (Render, Vercel, etc.), see:
-
-📄 **`DEPLOYMENT_GUIDE.md`** - Comprehensive deployment instructions for your supervisor
-
----
-
-## Scripts
-
-```bash
-npm start          # Start Expo development server
-npm run android    # Run on Android
-npm run ios        # Run on iOS
-npm run web        # Run in web browser
-npm run lint       # Run ESLint
-```
-
----
-
-## Support
-
-For deployment instructions, refer to `DEPLOYMENT_GUIDE.md`.
-
-For local development issues, check:
-- Expo documentation: https://docs.expo.dev/
-- React Native documentation: https://reactnative.dev/
-- Socket.io documentation: https://socket.io/docs/
-
----
-
-## License
-
-This project is part of the LucoBot robot receptionist system.
+Scan the QR with Expo Go on your phone (don't use `w` for web — `expo-secure-store` doesn't work in browsers, it's a native-only module).
+
+**5. What to check**
+- Login with your test credentials → no error, navigates to home
+- Home screen shows a brief spinner, then your name + employee code
+- Tap "Log Out" → returns to login screen
+- (Optional/harder to test) Wait 30+ min or manually expire a token, then trigger any authenticated call — should silently refresh rather than kick you out; only if the *refresh* token is also dead should it force logout
+
+## Known gotchas worth knowing about
+
+- **`localhost` doesn't work on-device** — it means "this phone," not your PC. Always use LAN IP or a tunnel.
+- **Web mode isn't supported for this app** — `expo-secure-store` needs native Keychain/Keystore, which doesn't exist in a browser.
+- **APK builds bake in the `.env` URL at build time** — if the URL changes later (e.g. your IP changes, or an ngrok tunnel restarts with a new URL), the APK needs to be rebuilt, not just have `.env` edited.
