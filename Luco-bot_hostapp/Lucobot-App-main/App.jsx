@@ -36,7 +36,7 @@ export default function App() {
       case 'login':
         return <Login goToHome={goToHome} />;
       case 'home':
-        return <Home logout={logout} currentUser={currentUser} />;
+        return <Home goToLogin={logout}/>;
       default:
         return <Login goToHome={goToHome} />;
     }

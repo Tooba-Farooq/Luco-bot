@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import React, { useEffect, useRef, useState } from 'react';
+import { login, registerDevice } from '../api/client';
 import {
     Alert,
     Animated,
@@ -16,23 +17,6 @@ import {
 } from 'react-native';
 import styles from './login_styling';
 
-function getServerUrl() {
-    const envUrl = process.env.EXPO_PUBLIC_SERVER_URL;
-    if (envUrl && typeof envUrl === 'string' && envUrl.trim().length > 0) return envUrl.trim();
-
-    // In Expo Go / development, derive the host from the Metro/Expo host and use port 3000.
-    const hostUri =
-        Constants.expoConfig?.hostUri ||
-        Constants.manifest?.debuggerHost ||
-        Constants.manifest2?.extra?.expoClient?.hostUri ||
-        '';
-
-    const host = String(hostUri).split(':')[0];
-    if (host) return `http://${host}:3000`;
-
-    // Fallback for cases where we cannot detect a host (production builds should set EXPO_PUBLIC_SERVER_URL).
-    return 'http://localhost:3000';
-}
 
 export default function Login({ goToHome }) {
     const [username, setUsername] = useState('');
@@ -92,41 +76,29 @@ export default function Login({ goToHome }) {
         blinkEyes();
     }, []);
 
-    const handleLogin = async () => {
-        if (!username.trim() || !password.trim()) {
-            Alert.alert('Error', 'Please enter both username and password');
-            return;
-        }
+   const handleLogin = async () => {
+    if (!username.trim() || !password.trim()) {
+        Alert.alert('Error', 'Please enter both username and password');
+        return;
+    }
 
-        setIsLoading(true);
+    setIsLoading(true);
 
-        try {
-            const SERVER_URL = getServerUrl();
-            const response = await fetch(`${SERVER_URL}/api/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    username: username.trim(),
-                    password: password.trim(),
-                }),
-            });
+    try {
+        await login(username.trim(), password.trim());
 
-            const data = await response.json();
+        // Register device right after login, per spec.
+        // Placeholder token for now — real push token comes later.
+        await registerDevice('placeholder-device-token', Platform.OS);
 
-            if (response.ok && data.success) {
-                goToHome(data.employee);
-            } else {
-                Alert.alert('Login Failed', data.message || 'Invalid credentials');
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Network error. Please try again.');
-            console.error('Login error:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+        goToHome();
+    } catch (error) {
+        Alert.alert('Login Failed', error.message || 'Invalid credentials');
+        console.error('Login error:', error);
+    } finally {
+        setIsLoading(false);
+    }
+};
 
     const togglePasswordVisibility = () => {
         setShowPassword(!showPassword);
