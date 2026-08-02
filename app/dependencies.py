@@ -19,7 +19,7 @@ def get_current_employee(
         employee_id = int(payload["sub"])
     except (ValueError, KeyError):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired or invalid — please log in again"
         )
 
     employee = db.query(Employee).filter(Employee.id == employee_id).first()

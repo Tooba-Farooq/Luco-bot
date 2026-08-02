@@ -2,7 +2,7 @@ import firebase_admin
 from firebase_admin import credentials, messaging
 from app.models_db import Employee
 
-cred = credentials.Certificate("app/luco-bot-firebase-adminsdk-fbsvc-23a758c6d4.json")
+cred = credentials.Certificate("app/luco-bot-bb3ff73ea10d.json")
 firebase_admin.initialize_app(cred)
 
 

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html><body>
+<button id="btn">Get Token</button>
+<pre id="out"></pre>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+  import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCllAjou5mbHgzzbfUtwYZkbv6grDsP2Do",
+    authDomain: "luco-bot.firebaseapp.com",
+    projectId: "luco-bot",
+    storageBucket: "luco-bot.firebasestorage.app",
+    messagingSenderId: "370724217740",
+    appId: "1:370724217740:web:3cc08c32cd96b5160aeca9"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const messaging = getMessaging(app);
+
+  document.getElementById("btn").onclick = async () => {
+  const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+  await Notification.requestPermission();
+  const token = await getToken(messaging, {
+    vapidKey: "BP_we3h4LlOAtmr-iOBCOqhx3F3pAzHVOOGVwHtDyNxlK_nyMa2s--vEbEmiIhDG92rqYturJMZOLmTuar3daL0",
+    serviceWorkerRegistration: registration
+  });
+  document.getElementById("out").textContent = token;
+};
+  onMessage(messaging, (payload) => alert("Push received: " + JSON.stringify(payload.notification)));
+</script>
+</body></html>
