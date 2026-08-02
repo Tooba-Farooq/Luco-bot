@@ -189,7 +189,10 @@ Same pattern as Deliverable 2 (the activation page) — a standalone page, no lo
 1. Build a page that reads a `token` query param, e.g. `<wherever-you-host-it>/visit-status?token=abc123`
 2. Once built and hosted, send the backend dev the base URL — same as you did for the activation page
 3. Backend will append the visitor's `status_token` (generated per-visit, already stored on `VisitSession`) to that URL and render it as a QR code at the kiosk, so the visitor can scan it and check their own status from their phone
-4. Endpoint to fetch status by token: _(not built yet — will be documented here once ready)_
+4. This will be a WebSocket connection, not a REST fetch — connect to
+   `wss://<backend-host>/ws/status/{status_token}` and listen for
+   pushed updates (not built yet — URL and message shape will be
+   documented here once ready).\_
 
 ---
 
