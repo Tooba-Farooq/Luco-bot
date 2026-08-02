@@ -12,7 +12,7 @@ def save_employee_photo(photo_bytes: bytes, original_filename: str) -> str:
     """Saves uploaded photo bytes to disk with a unique filename, returns the path."""
     file_extension = original_filename.split(".")[-1]
     unique_filename = f"{uuid.uuid4()}.{file_extension}"
-    photo_path = os.path.join(PHOTOS_DIR, unique_filename)
+    photo_path = os.path.join(PHOTOS_DIR, unique_filename).replace("\\", "/")
 
     with open(photo_path, "wb") as f:
         f.write(photo_bytes)

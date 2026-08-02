@@ -5,7 +5,7 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import detection, employees, audio, session, auth, ws, host_response
+from app.routes import detection, employees, audio, session, auth, ws, host_response, host
 from app.database import engine, Base
 from contextlib import asynccontextmanager
 from app.services.tts_service import build_static_audio_cache
@@ -47,3 +47,4 @@ app.include_router(session.router)
 app.include_router(auth.router)
 app.include_router(ws.router)
 app.include_router(host_response.router)
+app.include_router(host.router)

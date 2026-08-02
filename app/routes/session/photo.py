@@ -80,7 +80,7 @@ async def capture_photo(session_id: str = Form(...), frame: UploadFile = File(..
         raise HTTPException(status_code=409, detail="Image too blurry — retry capture")
 
     # save the raw frame to disk
-    photo_path = os.path.join(PHOTO_DIR, f"{uuid.uuid4().hex}.jpg")
+    photo_path = os.path.join(PHOTO_DIR, f"{uuid.uuid4().hex}.jpg").replace("\\", "/")
     cv2.imwrite(photo_path, image)
 
     # CHANGED: embedding may legitimately fail for occluded faces (niqab, mask, etc.) —

@@ -143,15 +143,53 @@ Delivery behavior by app state:
 - **Killed/backgrounded:** OS shows the (text-only) tray notification automatically. On tap, use `session_id` from the notification's data/intent extras to route to the visitor-response screen, then load `visitor_photo_url` there.
 - **Foregrounded:** `onMessageReceived` fires immediately with the same payload — show your own in-app UI (banner/alert) rather than relying on a tray notification, since Android doesn't auto-display one while the app is in the foreground.
 
-Not yet available: a way to check for a missed/unresolved alert if the app was closed when the push arrived and got dismissed/missed. Will be added as a small "pending alert" endpoint — documented here once ready.
+### Checking for missed alerts
+
+Push is fire-and-forget — if the app was closed when it arrived and the tray notification was dismissed/missed, nothing tells the app it happened. Call this whenever the app opens or resumes, to catch anything unresolved regardless of whether a push was seen:
+
+​`
+GET /host/pending-alerts
+Authorization: Bearer <access_token>
+​`
+
+Returns **all** unresolved visitor alerts for the logged-in host, not just the most recent — a host may have several waiting (e.g. after being in a meeting):
+
+​`json
+{
+  "pending": [
+    {
+      "session_id": "...",
+      "visitor_name": "...",
+      "purpose": "...",
+      "visitor_photo_url": "...",
+      "arrived_at": "2026-08-02T10:15:00"
+    }
+  ]
+}
+​`
+
+`pending` is `[]` if nothing's waiting. List is ordered oldest-first as a display hint (so the UI can naturally show "waiting longest" at top) — the host can act on any entry in any order, not necessarily top-to-bottom.
+
+---
 
 ## Not built yet
 
-- Host-response endpoints (Available / Not available / Wait) — in progress, not tested yet, will be documented here once ready
-- "Pending alert" sync endpoint — for the case where the app was closed/killed when a push arrived and the notification wasn't seen; lets the app check for any unresolved visitor alert on open, independent of push. Not built yet, needed to fully match "catch up on missed alerts" behavior.
+- Host-response endpoint (`POST /host/respond` — Available / Not available / Wait, with wait duration) — in progress, not built yet, will be documented here once ready
+- QR-based visitor status page — visitor scans a QR code at the kiosk and sees their own status page. Needs a hosted page from the frontend side; see note below.
 - Visit history endpoint
 - Password reset flow
 - Admin UI for creating employees (internal tool, separate from both deliverables above)
+
+---
+
+## Deliverable 3: Visitor status page (QR code)
+
+Same pattern as Deliverable 2 (the activation page) — a standalone page, no login, hosted anywhere (Netlify is fine, same as before).
+
+1. Build a page that reads a `token` query param, e.g. `<wherever-you-host-it>/visit-status?token=abc123`
+2. Once built and hosted, send the backend dev the base URL — same as you did for the activation page
+3. Backend will append the visitor's `status_token` (generated per-visit, already stored on `VisitSession`) to that URL and render it as a QR code at the kiosk, so the visitor can scan it and check their own status from their phone
+4. Endpoint to fetch status by token: _(not built yet — will be documented here once ready)_
 
 ---
 
@@ -164,3 +202,5 @@ Not yet available: a way to check for a missed/unresolved alert if the app was c
 | 403 on `/login`                  | Account exists but not activated yet               |
 | 401 on any authenticated request | Access token expired → call `/auth/refresh`, retry |
 | 401 on `/refresh`                | Refresh token expired → force full re-login        |
+
+---
