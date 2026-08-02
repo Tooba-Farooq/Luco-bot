@@ -15,9 +15,14 @@ async def send_host_alert(employee: Employee, visitor_name: str, visitor_photo_u
         notification=messaging.Notification(
             title=f"{visitor_name} is here to see you",
             body=purpose,
-            image=visitor_photo_url,
+            # image intentionally omitted — tray notifications crop to a circle,
+            # which looks wrong for visitor photos. Full photo is sent via `data`
+            # instead, for the app to render properly once opened.
         ),
-        data={"session_id": session_id},
+        data={
+            "session_id": session_id,
+            "visitor_photo_url": visitor_photo_url or "",
+        },
         token=employee.device_token,
     )
 

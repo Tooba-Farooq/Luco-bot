@@ -123,10 +123,32 @@ Show as an error. Tokens expire after 7 days or after first use.
 
 ---
 
+### Push notifications
+
+Once registered, visitor alerts arrive via FCM automatically — no polling needed. Tested and working end to end.
+
+Payload shape:
+
+​`json
+{
+  "notification": { "title": "<visitor name> is here to see you", "body": "<purpose>" },
+  "data": { "session_id": "<uuid>", "visitor_photo_url": "<url or empty string>" }
+}
+​`
+
+**Tray notification is text-only by design** — no `image` field. Circular-cropped tray icons look wrong for visitor photos, so the photo isn't part of the OS-rendered notification at all. `visitor_photo_url` is sent only in `data`, for the app to load and display full-size once the visitor-response screen is shown. Treat an empty string as "no photo available."
+
+Delivery behavior by app state:
+
+- **Killed/backgrounded:** OS shows the (text-only) tray notification automatically. On tap, use `session_id` from the notification's data/intent extras to route to the visitor-response screen, then load `visitor_photo_url` there.
+- **Foregrounded:** `onMessageReceived` fires immediately with the same payload — show your own in-app UI (banner/alert) rather than relying on a tray notification, since Android doesn't auto-display one while the app is in the foreground.
+
+Not yet available: a way to check for a missed/unresolved alert if the app was closed when the push arrived and got dismissed/missed. Will be added as a small "pending alert" endpoint — documented here once ready.
+
 ## Not built yet
 
-- Push delivery of visitor alerts (device token is stored, nothing sends to it yet)
 - Host-response endpoints (Available / Not available / Wait) — in progress, not tested yet, will be documented here once ready
+- "Pending alert" sync endpoint — for the case where the app was closed/killed when a push arrived and the notification wasn't seen; lets the app check for any unresolved visitor alert on open, independent of push. Not built yet, needed to fully match "catch up on missed alerts" behavior.
 - Visit history endpoint
 - Password reset flow
 - Admin UI for creating employees (internal tool, separate from both deliverables above)
