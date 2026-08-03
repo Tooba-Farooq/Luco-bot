@@ -18,6 +18,7 @@ async def confirm_host(payload: SelectHostRequest, db: Session = Depends(get_db)
         raise HTTPException(status_code=404, detail="Employee not found")
 
     detection_state.selected_host_id = employee.id
+    detection_state.selected_host_name = employee.name
     detection_state.host_candidates = None
     detection_state.state = "AWAITING_PURPOSE"
 

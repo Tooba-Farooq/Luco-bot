@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from typing import Optional
+from datetime import datetime
 
 
 class HostSummary(BaseModel):
@@ -41,6 +42,7 @@ class RespondResponse(BaseModel):
     host_candidates: Optional[List[HostSummary]] = None
     audio_base64: Optional[str] = None       # ← add if missing
     audio_key: Optional[str] = None 
+    qr_base64: str | None = None
 
 class PhotoFrameResponse(BaseModel):
     face_found: bool
@@ -100,3 +102,4 @@ class HostRespondRequest(BaseModel):
     session_id: str
     response: str  # "available" | "not_available" | "wait"
     wait_minutes: int | None = None  # required only when response == "wait"
+    available_again_at: datetime | None = None

@@ -7,7 +7,8 @@ from app.services.host_service import find_host
 from app.services.detection_state import detection_state
 from app.services.tts_service import generate_dynamic_audio
 from app.services.session_service import persist_at_handoff
-from app.models_db import Visitor, VisitLog
+from app.services.qr_service import generate_status_qr_base64
+from app.models_db import Visitor, VisitLog, Employee
 from app.models import RespondResponse
 import tempfile
 import os
@@ -118,13 +119,19 @@ async def respond(
             detection_state.visit_log_id = new_visit.id
 
             detection_state.state = "READY_FOR_HANDOFF"
-            await persist_at_handoff(db)
+            session = await persist_at_handoff(db)
+
+            employee_name = detection_state.selected_host_name or "your host"
+
+            answer_text = f"Thanks — I'm alerting {employee_name}. Please scan the QR code so we can notify you on your phone. Meanwhile, feel free to wait in the waiting area."
+            audio_base64, _ = await generate_dynamic_audio(answer_text)
+            qr_base64 = generate_status_qr_base64(session.status_token)
 
             response = RespondResponse(
                 session_id=session_id, state="READY_FOR_HANDOFF",
                 heard_text=heard_text, detected_lang=detected_lang,
-                answer_text="Thanks — I'll let them know you're here.",
-                audio_key="ready_for_handoff"
+                answer_text=answer_text, audio_base64=audio_base64,
+                qr_base64=qr_base64
             )
             detection_state.reset()
             return response

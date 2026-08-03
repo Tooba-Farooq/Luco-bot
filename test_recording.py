@@ -297,6 +297,17 @@ def simulate_conversation(session_id: str):
 
         if state == "READY_FOR_HANDOFF":
             print("Flow completed at READY_FOR_HANDOFF.")
+            qr_base64 = data.get("qr_base64")
+            if qr_base64:
+                import base64, tempfile, webbrowser
+                qr_bytes = base64.b64decode(qr_base64)
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+                    f.write(qr_bytes)
+                    qr_path = f.name
+                webbrowser.open(f"file://{qr_path}")
+                print(f"Opened QR code image: {qr_path}")
+            else:
+                print("No qr_base64 in response.")
             break
 
         if state in ("FALLBACK", "QUERY_ANSWERED"):

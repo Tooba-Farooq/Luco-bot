@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Visitor Status (TEST)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #111; color: #eee; padding: 40px; }
+    #status { font-size: 22px; padding: 24px; border-radius: 12px; background: #222; max-width: 500px; }
+    #state { font-size: 13px; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    #message { line-height: 1.5; }
+    #meta { margin-top: 16px; font-size: 13px; color: #999; }
+    .disconnected { color: #e55; }
+  </style>
+</head>
+<body>
+  <h2>Visitor Status — TEST PAGE</h2>
+  <div id="status">
+    <div id="state">waiting for connection...</div>
+    <div id="message">Connecting...</div>
+    <div id="meta"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    const stateEl = document.getElementById("state");
+    const messageEl = document.getElementById("message");
+    const metaEl = document.getElementById("meta");
+
+    if (!token) {
+      messageEl.textContent = "No token provided. Open as visitor_status_test.html?token=YOUR_STATUS_TOKEN";
+    } else {
+      const ws = new WebSocket(`ws://127.0.0.1:8000/ws/status/${token}`);
+
+      ws.onopen = () => {
+        stateEl.textContent = "connected";
+        messageEl.textContent = "Waiting for host response...";
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        stateEl.textContent = data.state || "unknown state";
+        messageEl.textContent = data.visitor_message || "(no message field yet)";
+        metaEl.innerHTML = `
+          host_response: ${data.host_response ?? "null"}<br>
+          wait_until: ${data.wait_until ?? "null"}<br>
+          available_again_at: ${data.available_again_at ?? "null"}
+        `;
+      };
+
+      ws.onclose = () => {
+        stateEl.textContent = "disconnected";
+        stateEl.classList.add("disconnected");
+      };
+
+      ws.onerror = () => {
+        messageEl.textContent = "Connection error — check status_token is valid and backend is running.";
+      };
+    }
+  </script>
+</body>
+</html>

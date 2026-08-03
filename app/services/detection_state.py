@@ -12,6 +12,7 @@ class DetectionState:
         self.intent = None
         self.host_candidates = None
         self.selected_host_id = None
+        self.selected_host_name = None
         self.purpose = None
         self.recognized_name = None
         # name/photo, now captured at the end

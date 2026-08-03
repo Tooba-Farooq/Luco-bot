@@ -8,9 +8,9 @@ from app.models_db import Employee, VisitSession
 from app.models import HostRespondRequest
 from app.dependencies import get_current_employee
 from app.services.connection_manager import manager
+from app.services.visitor_status_service import build_visitor_status
 
 router = APIRouter()
-
 
 VALID_RESPONSES = ("available", "not_available", "wait")
 
@@ -37,17 +37,32 @@ async def host_respond(
         if not payload.wait_minutes or payload.wait_minutes <= 0:
             raise HTTPException(status_code=400, detail="wait_minutes is required and must be positive when response is 'wait'")
         session.wait_until = datetime.now(timezone.utc) + timedelta(minutes=payload.wait_minutes)
+        session.available_again_at = None
+    elif payload.response == "not_available":
+        session.wait_until = None
+        session.available_again_at = payload.available_again_at  # optional, may be None
     else:
-        session.wait_until = None  # clear any previous wait if host changes their mind
+        session.wait_until = None
+        session.available_again_at = None
 
     session.host_response = payload.response
     db.commit()
 
+    status = build_visitor_status(
+        response=payload.response,
+        employee=current_employee,
+        wait_minutes=payload.wait_minutes,
+        wait_until=session.wait_until,
+        available_again_at=payload.available_again_at,
+    )
+
     if session.status_token:
         await manager.send_update(session.status_token, {
-            "state": session.state,
+            "state": status["visitor_state"],
+            "visitor_message": status["visitor_message"],
             "host_response": session.host_response,
             "wait_until": session.wait_until.isoformat() if session.wait_until else None,
+            "available_again_at": session.available_again_at.isoformat() if session.available_again_at else None,
             "visitor_choice": session.visitor_choice,
         })
 
@@ -55,4 +70,6 @@ async def host_respond(
         "detail": "Response recorded",
         "host_response": session.host_response,
         "wait_until": session.wait_until,
+        "available_again_at": session.available_again_at,
+        **status,
     }
