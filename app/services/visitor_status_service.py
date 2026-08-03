@@ -20,7 +20,9 @@ def build_visitor_status(
     if response == "wait":
         remaining = wait_minutes
         if wait_until:
-            delta = wait_until - datetime.now(timezone.utc)
+            # SQLite strips tzinfo on round-trip — normalize to aware UTC before subtracting
+            wu = wait_until if wait_until.tzinfo else wait_until.replace(tzinfo=timezone.utc)
+            delta = wu - datetime.now(timezone.utc)
             remaining = max(0, math.ceil(delta.total_seconds() / 60))
         until_str = wait_until.strftime("%I:%M %p") if wait_until else None
 

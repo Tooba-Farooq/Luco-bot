@@ -183,12 +183,14 @@ Content-Type: application/json
 {
 "session_id": "...",
 "response": "available" | "not_available" | "wait",
-"wait_minutes": 20
+"wait_minutes": 20,
+"available_again_at": "2026-08-05T15:00:00"
 }
 ​`
 
 - `response` maps to your three buttons: **Send In → `"available"`**, **Not Available → `"not_available"`**, **Wait → `"wait"`**.
 - `wait_minutes` is **required only** when `response` is `"wait"` — omit it otherwise. Suggested picker values: 5 / 10 / 30 / 60 / 120 minutes, plus a custom numeric entry. Any positive integer is accepted.
+- `available_again_at` is **optional**, only used when `response` is `"not_available"`. If the host wants to give the visitor a specific return date/time, send it as an ISO datetime; if omitted, the visitor just gets a generic "come back another time" message.
 - A session belongs to whichever host it was routed to — responding to a `session_id` not assigned to the logged-in host returns `403`.
 
 Success response:
@@ -197,13 +199,18 @@ Success response:
 {
   "detail": "Response recorded",
   "host_response": "wait",
-  "wait_until": "2026-08-03T15:40:00Z"
+  "wait_until": "2026-08-03T15:40:00Z",
+  "available_again_at": null,
+  "visitor_state": "HOST_ASKED_WAIT",
+  "visitor_message": "Tooba Farooq is currently unavailable and has asked you to wait about 20 more minutes (until 3:40 PM)."
 }
 ​`
 
+`visitor_message` is the exact human-readable sentence shown to the visitor on their status page — same wording, pushed live over the WebSocket the moment you respond (see Deliverable 3). `visitor_state` is a machine-readable flag if you want to key off it in the app UI too (`PROCEED_TO_HOST`, `HOST_ASKED_WAIT`, `HOST_UNAVAILABLE`).
+
 Errors: `404` if `session_id` doesn't exist, `403` if it's not this host's session, `400` if `response` is invalid or `wait_minutes` is missing/non-positive when `response` is `"wait"`.
 
-Note on "Wait": choosing Wait does **not** remove the alert from `/host/pending-alerts` — see above. It's meant for cases like "I'm in a meeting, ask them to wait 30 min," so the host can still see and act on it early if they finish sooner than the wait duration.
+Note on "Wait": choosing Wait does **not** remove the alert from `/host/pending-alerts` — see above. It's meant for cases like "I'm in a meeting, ask them to wait 30 min," so the host can still see and act on it early if they finish sooner than the wait duration. Selecting "Wait" again on the same session (e.g. extending the wait) is supported — just call this endpoint again with a new `wait_minutes`.
 
 ---
 
@@ -224,10 +231,29 @@ Same pattern as Deliverable 2 (the activation page) — a standalone page, no lo
 1. Build a page that reads a `token` query param, e.g. `<wherever-you-host-it>/visit-status?token=abc123`
 2. Once built and hosted, send the backend dev the base URL — same as you did for the activation page
 3. Backend will append the visitor's `status_token` (generated per-visit, already stored on `VisitSession`) to that URL and render it as a QR code at the kiosk, so the visitor can scan it and check their own status from their phone
-4. This will be a WebSocket connection, not a REST fetch — connect to
-   `wss://<backend-host>/ws/status/{status_token}` and listen for
-   pushed updates (not built yet — URL and message shape will be
-   documented here once ready).\_
+4. **✅ Built and tested end to end.** Connect via WebSocket to:
+
+   ​`
+wss://<backend-host>/ws/status/{status_token}
+​`
+
+   On connect, you'll immediately receive the current status (covers the case where the host already responded before the page loaded). After that, any host response pushes a new message instantly, no polling needed.
+
+   Message shape:
+
+   ​`json
+{
+  "state": "HOST_ASKED_WAIT",
+  "visitor_message": "Tooba Farooq is currently unavailable and has asked you to wait about 18 more minutes (until 3:40 PM).",
+  "host_response": "wait",
+  "wait_until": "2026-08-03T15:40:00Z",
+  "available_again_at": null,
+  "visitor_choice": null
+}
+​`
+   - Just display `visitor_message` directly — it's already a complete, human-readable sentence.
+   - `state` is one of `PROCEED_TO_HOST`, `HOST_ASKED_WAIT`, `HOST_UNAVAILABLE` — use it if you want different visual treatment per state (e.g. a green "proceed" banner vs. a waiting spinner).
+   - Socket closes with code `4404` if the `status_token` in the URL doesn't match any session — handle that as "invalid or expired link."
 
 ---
 
