@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Visit Status</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 40px; background: #0f172a; color: #fff; }
+    #status { font-size: 20px; margin-top: 20px; }
+    #photo { width: 96px; height: 96px; border-radius: 48px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>Your Visit Status</h2>
+  <div id="status">Connecting...</div>
+  <img id="photo" style="display:none;" />
+
+  <script>
+    const API_BASE = "wss://take-awaken-cactus.ngrok-free.dev";
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+
+    if (!token) {
+      document.getElementById("status").textContent = "Missing status token.";
+    } else {
+      const ws = new WebSocket(`${API_BASE}/ws/status/${token}`);
+
+      ws.onopen = () => {
+        document.getElementById("status").textContent = "Waiting for updates...";
+      };
+
+      ws.onmessage = (event) => {
+        console.log("Status update:", event.data);
+        document.getElementById("status").textContent = event.data;
+      };
+
+      ws.onerror = () => {
+        document.getElementById("status").textContent = "Connection error.";
+      };
+
+      ws.onclose = () => {
+        document.getElementById("status").textContent += " (connection closed)";
+      };
+    }
+  </script>
+</body>
+</html>
