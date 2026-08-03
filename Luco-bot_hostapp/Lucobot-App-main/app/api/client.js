@@ -127,6 +127,36 @@ export async function getMe() {
   return response.json();
 }
 
+export async function getPendingAlerts() {
+  const response = await authFetch(`${BASE_URL}/host/pending-alerts`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch pending alerts');
+  }
+
+  return response.json();
+}
+
+export async function respondToAlert(sessionId, response, waitMinutes) {
+  const body = { session_id: sessionId, response };
+  if (response === 'wait') {
+    body.wait_minutes = waitMinutes;
+  }
+
+  const res = await authFetch(`${BASE_URL}/host/respond`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || 'Failed to respond to alert');
+  }
+
+  return res.json();
+}
+
 export async function logout() {
   await clearTokens();
 }

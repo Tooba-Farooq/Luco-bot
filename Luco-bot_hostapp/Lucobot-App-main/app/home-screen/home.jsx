@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { getMe, logout as logoutClient } from "../api/client";
+import { getMe, getPendingAlerts, logout as logoutClient } from "../api/client";
 
-export default function Home({ goToLogin }) {
+export default function Home({ goToLogin, goToAlerts })  {
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,6 +20,12 @@ export default function Home({ goToLogin }) {
     try {
       const data = await getMe();
       setEmployee(data);
+
+      const alertData = await getPendingAlerts();
+      if (alertData.pending && alertData.pending.length > 0) {
+        goToAlerts(alertData.pending);
+        return;
+      }
     } catch (err) {
       console.error("Failed to load profile:", err);
       if (err.message === 'Refresh failed, session expired') {
