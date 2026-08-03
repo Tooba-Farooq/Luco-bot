@@ -99,3 +99,4 @@ class DeviceTokenRequest(BaseModel):
 class HostRespondRequest(BaseModel):
     session_id: str
     response: str  # "available" | "not_available" | "wait"
+    wait_minutes: int | None = None  # required only when response == "wait"

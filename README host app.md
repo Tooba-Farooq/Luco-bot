@@ -163,18 +163,53 @@ Returns **all** unresolved visitor alerts for the logged-in host, not just the m
       "purpose": "...",
       "visitor_photo_url": "...",
       "arrived_at": "2026-08-02T10:15:00"
+      "host_response": null,
+      "wait_until": null
     }
   ]
 }
 ​`
 
 `pending` is `[]` if nothing's waiting. List is ordered oldest-first as a display hint (so the UI can naturally show "waiting longest" at top) — the host can act on any entry in any order, not necessarily top-to-bottom.
+host_response is null for a brand-new alert, or "wait" if the host already deferred it. wait_until is null unless host_response is "wait", in which case it's an ISO timestamp.
+
+### Responding to an alert
+
+​`
+POST /host/respond
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+"session_id": "...",
+"response": "available" | "not_available" | "wait",
+"wait_minutes": 20
+}
+​`
+
+- `response` maps to your three buttons: **Send In → `"available"`**, **Not Available → `"not_available"`**, **Wait → `"wait"`**.
+- `wait_minutes` is **required only** when `response` is `"wait"` — omit it otherwise. Suggested picker values: 5 / 10 / 30 / 60 / 120 minutes, plus a custom numeric entry. Any positive integer is accepted.
+- A session belongs to whichever host it was routed to — responding to a `session_id` not assigned to the logged-in host returns `403`.
+
+Success response:
+
+​`json
+{
+  "detail": "Response recorded",
+  "host_response": "wait",
+  "wait_until": "2026-08-03T15:40:00Z"
+}
+​`
+
+Errors: `404` if `session_id` doesn't exist, `403` if it's not this host's session, `400` if `response` is invalid or `wait_minutes` is missing/non-positive when `response` is `"wait"`.
+
+Note on "Wait": choosing Wait does **not** remove the alert from `/host/pending-alerts` — see above. It's meant for cases like "I'm in a meeting, ask them to wait 30 min," so the host can still see and act on it early if they finish sooner than the wait duration.
 
 ---
 
 ## Not built yet
 
-- Host-response endpoint (`POST /host/respond` — Available / Not available / Wait, with wait duration) — in progress, not built yet, will be documented here once ready
+- Visit history endpoint (`GET /host/alert-history` or similar — will show resolved alerts, i.e. `host_response` of `"available"` or `"not_available"`)
 - QR-based visitor status page — visitor scans a QR code at the kiosk and sees their own status page. Needs a hosted page from the frontend side; see note below.
 - Visit history endpoint
 - Password reset flow
@@ -198,12 +233,15 @@ Same pattern as Deliverable 2 (the activation page) — a standalone page, no lo
 
 ## Errors to handle
 
-| Status                           | Meaning                                            |
-| -------------------------------- | -------------------------------------------------- |
-| 400 on `/activate`               | Invalid or expired invite token                    |
-| 401 on `/login`                  | Wrong `employee_code` or password                  |
-| 403 on `/login`                  | Account exists but not activated yet               |
-| 401 on any authenticated request | Access token expired → call `/auth/refresh`, retry |
-| 401 on `/refresh`                | Refresh token expired → force full re-login        |
+| Status                           | Meaning                                                                                 |
+| -------------------------------- | --------------------------------------------------------------------------------------- |
+| 400 on `/activate`               | Invalid or expired invite token                                                         |
+| 401 on `/login`                  | Wrong `employee_code` or password                                                       |
+| 403 on `/login`                  | Account exists but not activated yet                                                    |
+| 401 on any authenticated request | Access token expired → call `/auth/refresh`, retry                                      |
+| 401 on `/refresh`                | Refresh token expired → force full re-login                                             |
+| 404 on `/host/respond`           | `session_id` doesn't exist                                                              |
+| 403 on `/host/respond`           | Session is assigned to a different host                                                 |
+| 400 on `/host/respond`           | Invalid `response` value, or missing/invalid `wait_minutes` when `response` is `"wait"` |
 
 ---

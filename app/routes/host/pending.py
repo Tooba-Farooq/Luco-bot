@@ -19,7 +19,7 @@ def pending_alerts(
         .filter(
             VisitSession.selected_host_id == current_employee.id,
             VisitSession.is_closed == False,
-            VisitSession.host_response.is_(None),
+            VisitSession.host_response.in_([None, "wait"]),  # <-- was .is_(None)
         )
         .order_by(VisitSession.host_alert_sent_at.asc())
         .all()
@@ -40,6 +40,8 @@ def pending_alerts(
             "purpose": session.purpose or "",
             "visitor_photo_url": visitor_photo_url,
             "arrived_at": session.host_alert_sent_at.isoformat() if session.host_alert_sent_at else None,
+            "host_response": session.host_response,  # so the UI can badge "waiting" vs "new"
+            "wait_until": session.wait_until.isoformat() if session.wait_until else None,
         })
 
     return {"pending": results}
