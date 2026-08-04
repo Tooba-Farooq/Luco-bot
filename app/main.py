@@ -1,11 +1,13 @@
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
+
 load_dotenv()
 
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import detection, employees, audio, session, auth, ws, host
+from app.routes import detection, employees, audio, session, auth, host, visitor
+from app.routes.visitor import status_ws
 from app.database import engine, Base
 from contextlib import asynccontextmanager
 from app.services.tts_service import build_static_audio_cache
@@ -30,6 +32,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://luco-bot-activation.netlify.app",
+        "https://lucobot-visit-status.netlify.app",
         "http://localhost:5500",
         "http://127.0.0.1:5500",
     ],
@@ -45,5 +48,6 @@ app.include_router(employees.router)
 app.include_router(audio.router)
 app.include_router(session.router)
 app.include_router(auth.router)
-app.include_router(ws.router)
 app.include_router(host.router)
+app.include_router(visitor.router)
+app.include_router(status_ws.router)

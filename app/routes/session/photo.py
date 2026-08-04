@@ -73,12 +73,14 @@ async def capture_photo(session_id: str = Form(...), frame: UploadFile = File(..
     # re-verify quality server-side even though client already saw green
     face_found, face_box = check_face_present(image)
     if not face_found or not check_face_forward(image, face_box) or not check_face_centered(image, face_box):
+        detection_state.photo_steady_start_time = None  # force a fresh steady window on retry
         raise HTTPException(status_code=409, detail="Face not steady — retry capture")
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
-    print(f"Blur score: {blur_score:.1f}")  # temporary, remove once calibrated
+    print(f"Blur score: {blur_score:.1f}")
     if blur_score < 20.0:
+        detection_state.photo_steady_start_time = None  # force a fresh steady window on retry
         raise HTTPException(status_code=409, detail="Image too blurry — retry capture")
 
     # save the raw frame to disk

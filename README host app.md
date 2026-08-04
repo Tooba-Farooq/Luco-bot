@@ -158,6 +158,7 @@ Returns **all** unresolved visitor alerts for the logged-in host, not just the m
 {
   "pending": [
     {
+      "visitor_id": 123,
       "session_id": "...",
       "visitor_name": "...",
       "purpose": "...",
@@ -172,6 +173,35 @@ Returns **all** unresolved visitor alerts for the logged-in host, not just the m
 
 `pending` is `[]` if nothing's waiting. List is ordered oldest-first as a display hint (so the UI can naturally show "waiting longest" at top) — the host can act on any entry in any order, not necessarily top-to-bottom.
 host_response is null for a brand-new alert, or "wait" if the host already deferred it. wait_until is null unless host_response is "wait", in which case it's an ISO timestamp.
+
+### Message history
+
+The host app can also load the message history endpoint:
+
+```
+GET /host/messages
+Authorization: Bearer <access_token>
+```
+
+Response shape:
+
+​`json
+{
+  "messages": [
+    {
+      "visitor_id": 123,
+      "session_id": "...",
+      "visitor_name": "Tooba Farooq",
+      "visitor_photo_url": "...",
+      "message_text": "...",
+      "purpose": "...",
+      "left_at": "2026-08-04T13:06:46.823468"
+    }
+  ]
+}
+​`
+
+Use `visitor_id` as the stable grouping key when you want the frontend to show one chat thread per visitor across multiple visits. Keep `session_id` for visit-specific actions and traceability.
 
 ### Responding to an alert
 

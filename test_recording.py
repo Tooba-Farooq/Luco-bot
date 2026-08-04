@@ -251,8 +251,11 @@ def run_photo_capture(session_id: str) -> dict | None:
                     if check.get("ready_to_capture"):
                         print("\nReady — capturing...")
                         result_data = send_capture_photo(session_id, frame)
+                        if result_data is None:
+                            print("Capture failed (see error above) — hold steady, retrying...")
+                            continue
                         break
-
+                    
             h, w = frame.shape[:2]
             cv2.rectangle(frame, (int(w*0.25), int(h*0.15)), (int(w*0.75), int(h*0.85)), color, 3)
             cv2.putText(frame, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
