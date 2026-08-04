@@ -8,9 +8,12 @@ public enum FaceExpression
     Happy,
     Thinking,
     Apologetic,
-    Success
+    Success,
+    Greeting,
+    Handoff,
+    Purpose,
+    Confused
 }
-
 public class FaceExpressionController : MonoBehaviour
 {
     [Header("Face Parts")]
@@ -35,7 +38,7 @@ public class FaceExpressionController : MonoBehaviour
     private Vector3 eyeLeftBaseScale, eyeRightBaseScale, mouthBaseScale;
     private Vector3 eyeLeftBasePos, eyeRightBasePos, mouthBasePos;
     private Vector3 eyeLeftBaseRot, eyeRightBaseRot;
-
+    private Vector3 faceRootBasePos, faceRootBaseScale;
     [Header("Talking")]
     public AudioSource audioSource;
     public AudioClip testClip;
@@ -48,6 +51,7 @@ public class FaceExpressionController : MonoBehaviour
     public event System.Action OnTalkingFinished; // ADD — fires exactly when audio actually stops
 
     private Coroutine talkingRoutine;
+    private Coroutine breathingRoutine;
     private float[] audioSampleData = new float[64];
 
     void Start()
@@ -63,7 +67,12 @@ public class FaceExpressionController : MonoBehaviour
         eyeLeftBaseRot = eyeLeft.localEulerAngles;
         eyeRightBaseRot = eyeRight.localEulerAngles;
 
-        blinkLoopRoutine = StartCoroutine(BlinkLoop());
+        faceRootBasePos = ((RectTransform)transform).anchoredPosition3D;
+        faceRootBaseScale = transform.localScale;
+
+       blinkLoopRoutine = StartCoroutine(BlinkLoop());
+       breathingRoutine = StartCoroutine(BreathingLoop());
+
     }
 
     // ---------- PUBLIC API ----------
@@ -107,6 +116,101 @@ public class FaceExpressionController : MonoBehaviour
         t = 0f;
         while (t < 1f) { t += Time.deltaTime * blinkSpeed; eyeLeft.localScale = Vector3.Lerp(closedL, openL, t); eyeRight.localScale = Vector3.Lerp(closedR, openR, t); yield return null; }
     }
+    
+    IEnumerator BreathingLoop()
+    {
+        float t = 0f;
+        while (true)
+        {
+            // Only breathe while at rest — not mid-expression or mid-bounce
+            if (currentExpression == FaceExpression.Idle && !blinkingPaused)
+            {
+                t += Time.deltaTime * 0.8f; // slow cycle
+                float scale = 1f + Mathf.Sin(t) * 0.02f; // 1.0 -> 1.02 -> 1.0
+                transform.localScale = faceRootBaseScale * scale;
+            }
+            yield return null;
+        }
+    }
+    // ---------- BOUNCE ----------
+
+    IEnumerator Bounce(float height = 15f, float duration = 0.5f)
+    {
+        RectTransform rootRT = (RectTransform)transform;
+        Vector3 startPos = faceRootBasePos;
+        Vector3 upPos = startPos + new Vector3(0, height, 0);
+
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / (duration * 0.5f);
+            rootRT.anchoredPosition3D = Vector3.Lerp(startPos, upPos, Mathf.SmoothStep(0f, 1f, t));
+            yield return null;
+        }
+
+        t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / (duration * 0.5f);
+            rootRT.anchoredPosition3D = Vector3.Lerp(upPos, startPos, Mathf.SmoothStep(0f, 1f, t));
+            yield return null;
+        }
+
+        rootRT.anchoredPosition3D = startPos;
+    }
+
+    // ---------- EYE LOOK ----------
+
+    IEnumerator EyeLook(float xOffset = 12f, float duration = 0.25f)
+    {
+        Vector3 startL = eyeLeft.anchoredPosition3D;
+        Vector3 startR = eyeRight.anchoredPosition3D;
+        Vector3 targetL = eyeLeftBasePos + new Vector3(xOffset, 0, 0);
+        Vector3 targetR = eyeRightBasePos + new Vector3(xOffset, 0, 0);
+
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / duration;
+            eyeLeft.anchoredPosition3D = Vector3.Lerp(startL, targetL, t);
+            eyeRight.anchoredPosition3D = Vector3.Lerp(startR, targetR, t);
+            yield return null;
+        }
+
+        t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / duration;
+            eyeLeft.anchoredPosition3D = Vector3.Lerp(targetL, eyeLeftBasePos, t);
+            eyeRight.anchoredPosition3D = Vector3.Lerp(targetR, eyeRightBasePos, t);
+            yield return null;
+        }
+    }
+    
+    // ---------- HEAD TILT ----------
+
+    IEnumerator HeadTilt(float angle = 12f, float duration = 0.3f)
+    {
+        Vector3 startL = eyeLeft.localEulerAngles;
+        Vector3 startR = eyeRight.localEulerAngles;
+        Vector3 targetL = eyeLeftBaseRot + new Vector3(0, 0, angle);
+        Vector3 targetR = eyeRightBaseRot + new Vector3(0, 0, angle);
+
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / duration;
+            eyeLeft.localEulerAngles = new Vector3(
+                Mathf.LerpAngle(startL.x, targetL.x, t),
+                Mathf.LerpAngle(startL.y, targetL.y, t),
+                Mathf.LerpAngle(startL.z, targetL.z, t));
+            eyeRight.localEulerAngles = new Vector3(
+                Mathf.LerpAngle(startR.x, targetR.x, t),
+                Mathf.LerpAngle(startR.y, targetR.y, t),
+                Mathf.LerpAngle(startR.z, targetR.z, t));
+            yield return null;
+        }
+    }
 
     // ---------- EXPRESSIONS ----------
 
@@ -148,9 +252,39 @@ public class FaceExpressionController : MonoBehaviour
                 break;
 
             case FaceExpression.Success:
+                StartCoroutine(Bounce());
                 yield return LerpToPose(
                     eyeScale: new Vector3(1.2f, 1.2f, 1f),
                     mouthScale: new Vector3(1.3f, 1f, 1f));
+                yield return new WaitForSeconds(0.3f);
+                break;
+            
+            case FaceExpression.Greeting:
+                yield return EyeLook();
+                StartCoroutine(Bounce());
+                yield return LerpToPose(
+                    eyeScale: new Vector3(1.2f, 1.2f, 1f),
+                    mouthScale: new Vector3(1.2f, 1f, 1f));
+                break;
+            
+            case FaceExpression.Purpose:
+                yield return HeadTilt();
+                yield break;
+            
+            case FaceExpression.Confused:
+                yield return LerpToPose(
+                    eyeScale: new Vector3(0.85f, 0.85f, 1f));
+                yield return HeadTilt(angle: -8f, duration: 0.25f);
+                yield return new WaitForSeconds(0.5f);
+                break;
+            
+            case FaceExpression.Handoff:
+                StartCoroutine(Bounce(height: 20f, duration: 0.4f));
+                yield return LerpToPose(
+                    eyeScale: new Vector3(1.2f, 1.2f, 1f),
+                    mouthScale: new Vector3(1.3f, 1f, 1f));
+                yield return new WaitForSeconds(0.2f);
+                StartCoroutine(Bounce(height: 10f, duration: 0.3f));
                 yield return new WaitForSeconds(0.3f);
                 break;
         }

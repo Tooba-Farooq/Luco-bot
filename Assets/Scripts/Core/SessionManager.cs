@@ -26,6 +26,10 @@ public class SessionManager : MonoBehaviour
 
     private Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
 
+    // --- Cancellation support ---
+    private Coroutine activeRecordRoutine;
+    private Coroutine activeSendRoutine;
+
     void Awake() { Instance = this; }
 
     public void BeginSession(string sessionId)
@@ -36,7 +40,42 @@ public class SessionManager : MonoBehaviour
     // Call this whenever it's the visitor's turn to speak
     public void RecordAndSend()
     {
-        StartCoroutine(RecordAndSendRoutine());
+        // Make sure any previous recording/send cycle is fully stopped first
+        CancelPendingRecording();
+        activeRecordRoutine = StartCoroutine(RecordAndSendRoutine());
+    }
+
+    // Call this whenever the flow moves away from a state that expects audio
+    // (e.g. leaving ConversationScreen), so a late mic result can't get sent
+    // to a session that's no longer expecting it.
+    public void CancelPendingRecording()
+    {
+        if (activeRecordRoutine != null)
+        {
+            StopCoroutine(activeRecordRoutine);
+            activeRecordRoutine = null;
+        }
+
+        if (activeSendRoutine != null)
+        {
+            StopCoroutine(activeSendRoutine);
+            activeSendRoutine = null;
+        }
+
+        if (AudioRecorder.Instance != null)
+            AudioRecorder.Instance.StopRecording(); // no-op if nothing is recording; add this method if it doesn't exist yet
+
+        if (listeningIndicatorActive)
+            OnRecordingCancelledCleanup();
+    }
+
+    private bool listeningIndicatorActive = false;
+
+    private void OnRecordingCancelledCleanup()
+    {
+        listeningIndicatorActive = false;
+        // Intentionally does NOT invoke OnRecordingFailed or any face expression —
+        // cancellation is a normal flow transition, not a failure.
     }
 
     private IEnumerator RecordAndSendRoutine()
@@ -46,6 +85,7 @@ public class SessionManager : MonoBehaviour
         if (cueAudioSource != null && readyToSpeakChime != null)
             cueAudioSource.PlayOneShot(readyToSpeakChime);
 
+        listeningIndicatorActive = true;
         OnReadyToSpeak?.Invoke();
 
         AudioRecorder.Instance.StartRecording(OnAudioRecorded);
@@ -53,13 +93,16 @@ public class SessionManager : MonoBehaviour
 
     private void OnAudioRecorded(byte[] wavBytes)
     {
+        listeningIndicatorActive = false;
+        activeRecordRoutine = null;
+
         if (wavBytes == null)
         {
             Debug.LogWarning("No audio recorded.");
             OnRecordingFailed?.Invoke();
             return;
         }
-        StartCoroutine(SendToRespond(wavBytes));
+        activeSendRoutine = StartCoroutine(SendToRespond(wavBytes));
     }
 
     private IEnumerator SendToRespond(byte[] wavBytes)
@@ -71,6 +114,8 @@ public class SessionManager : MonoBehaviour
         using (UnityWebRequest www = UnityWebRequest.Post($"{detectionService.baseUrl}/session/respond", form))
         {
             yield return www.SendWebRequest();
+
+            activeSendRoutine = null;
 
             if (www.result == UnityWebRequest.Result.Success)
             {

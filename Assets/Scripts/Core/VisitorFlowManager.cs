@@ -55,14 +55,26 @@ public class VisitorFlowManager : MonoBehaviour
             case VisitorFlowState.GeneralQuery:
                 if (face != null) face.SetExpression(FaceExpression.Listening, autoReturnToIdle: false);
                 break;
+            
+            case VisitorFlowState.AskPurpose:
+            case VisitorFlowState.MeetSomeone_EnterPurpose:
+                if (face != null) face.SetExpression(FaceExpression.Purpose);
+                break;
 
             case VisitorFlowState.GreetKnownVisitor:
+                if (face != null) face.SetExpression(FaceExpression.Greeting);
+                break;
+
             case VisitorFlowState.HostAccepted:
                 if (face != null) face.SetExpression(FaceExpression.Happy);
                 break;
 
             case VisitorFlowState.HostUnavailable:
                 if (face != null) face.SetExpression(FaceExpression.Apologetic);
+                break;
+
+            case VisitorFlowState.MeetSomeone_ShowSimilarNames:
+                if (face != null) face.SetExpression(FaceExpression.Handoff);
                 break;
 
             case VisitorFlowState.VisitLogged:

@@ -17,6 +17,8 @@ public class AudioRecorder : MonoBehaviour
     private string micDevice;
     private AudioClip recordingClip;
     private bool isRecording = false;
+    private Coroutine activeRecordCoroutine;
+    private Action<byte[]> activeOnComplete;
 
     void Awake()
     {
@@ -34,7 +36,37 @@ public class AudioRecorder : MonoBehaviour
             return;
         }
 
-        StartCoroutine(RecordRoutine(onComplete));
+        // Guard against overlapping recordings
+        if (isRecording)
+        {
+            Debug.LogWarning("StartRecording called while already recording — stopping previous recording first.");
+            StopRecording();
+        }
+
+        activeOnComplete = onComplete;
+        activeRecordCoroutine = StartCoroutine(RecordRoutine(onComplete));
+    }
+
+    // Cancels an in-progress recording without invoking onComplete.
+    // Use this when the flow moves on and the result would no longer be wanted
+    // (e.g. ConversationScreen disabling because the session moved past
+    // a state that expects audio).
+    public void StopRecording()
+    {
+        if (!isRecording && activeRecordCoroutine == null)
+            return; // nothing to stop — safe no-op
+
+        if (activeRecordCoroutine != null)
+        {
+            StopCoroutine(activeRecordCoroutine);
+            activeRecordCoroutine = null;
+        }
+
+        if (Microphone.IsRecording(micDevice))
+            Microphone.End(micDevice);
+
+        isRecording = false;
+        activeOnComplete = null; // deliberately do NOT invoke — this is a cancellation, not a completion/failure
     }
 
     private IEnumerator RecordRoutine(Action<byte[]> onComplete)
@@ -79,6 +111,7 @@ public class AudioRecorder : MonoBehaviour
         int finalPos = Microphone.GetPosition(micDevice);
         Microphone.End(micDevice);
         isRecording = false;
+        activeRecordCoroutine = null;
 
         if (finalPos <= 0)
         {

@@ -62,6 +62,7 @@ public class VisitorDetectionHandler : MonoBehaviour
                 SessionManager.Instance.BeginSession(result.session_id);
                 flowManager.Session.isKnownVisitor = false;
                 detectionService.StopPolling();
+                if (face != null) face.SetExpression(FaceExpression.Greeting, autoReturnToIdle: false);
                 StartCoroutine(PlayCachedOrFetchAudio(result.audio_key, result.answer_text));
                 break;
 
@@ -72,6 +73,7 @@ public class VisitorDetectionHandler : MonoBehaviour
                 flowManager.Session.isKnownVisitor = true;
                 flowManager.Session.visitorName = result.visitor_name;
                 detectionService.StopPolling();
+                if (face != null) face.SetExpression(FaceExpression.Greeting, autoReturnToIdle: false);
                 PlayBase64Audio(result.audio_base64, result.answer_text);
                 break;
         }

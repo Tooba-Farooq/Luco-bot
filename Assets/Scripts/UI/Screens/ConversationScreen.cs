@@ -16,6 +16,7 @@ public class ConversationScreen : MonoBehaviour
     public TMP_InputField nameInputField;
     public Button submitNameButton;
     public VisitorFlowManager flowManager;
+    public FaceExpressionController face;
 
     private int selectedCandidateId = -1;
     private GameObject selectedCandidateButtonObj = null;
@@ -40,6 +41,12 @@ public class ConversationScreen : MonoBehaviour
 
     void OnDisable()
     {
+        // Stop any recording/send cycle still in flight so a late result
+        // can't reach a session that's already moved past this screen
+        // (this is what was causing "Not expecting audio in state: READY_FOR_HANDOFF").
+        if (SessionManager.Instance != null)
+            SessionManager.Instance.CancelPendingRecording();
+
         SessionManager.Instance.OnSessionUpdate -= HandleSessionUpdate;
         SessionManager.Instance.OnRecordingFailed -= HandleRecordingFailed;
         SessionManager.Instance.OnReadyToSpeak -= HandleReadyToSpeak;
@@ -82,6 +89,8 @@ public class ConversationScreen : MonoBehaviour
 
     void HandleSessionUpdate(SessionResponse response)
     {
+        if (!isActiveAndEnabled) return;
+
         listeningIndicator.SetActive(false);
         heardText.text = string.IsNullOrEmpty(response.heard_text) ? "" : $"You said: {response.heard_text}";
 
@@ -116,6 +125,9 @@ public class ConversationScreen : MonoBehaviour
                 if (response.matched_host != null && flowManager.Session != null)
                     flowManager.Session.hostName = response.matched_host.name;
 
+                if (flowManager.Session != null)
+                    flowManager.Session.qrBase64 = response.qr_base64;
+
                 flowManager.GoTo(VisitorFlowState.MeetSomeone_ShowSimilarNames);
                 break;
 
@@ -128,6 +140,7 @@ public class ConversationScreen : MonoBehaviour
             default:
                 Debug.LogWarning("Unhandled session state:" + response.state);
                 heardText.text = "Sorry, I didn't understand that. Please try again.";
+                if (face != null) face.SetExpression(FaceExpression.Confused);
                 StartListening();
                 break;
         }
@@ -222,7 +235,10 @@ public class ConversationScreen : MonoBehaviour
 
     void HandleRecordingFailed()
     {
+        if (!isActiveAndEnabled) return;
+
         heardText.text = "Didn't catch that. Please try again.";
+        if (face != null) face.SetExpression(FaceExpression.Confused);
         StartListening();
     }
 

@@ -13580,7 +13580,6 @@ MonoBehaviour:
   nameInputField: {fileID: 2139700598}
   submitNameButton: {fileID: 1765317458}
   flowManager: {fileID: 2089889922}
-  face: {fileID: 1902588907}
 --- !u!222 &1309977112
 CanvasRenderer:
   m_ObjectHideFlags: 0
