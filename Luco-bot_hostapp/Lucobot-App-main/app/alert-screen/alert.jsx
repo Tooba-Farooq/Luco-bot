@@ -12,6 +12,16 @@ import {
 } from "react-native";
 import { respondToAlert } from "../api/client";
 
+// Backend may return naive UTC timestamps (no "Z" or offset suffix).
+// JS Date() treats a naive string as local time, which caused times to
+// appear ~5 hours off in Pakistan. This forces UTC interpretation when
+// the string has no explicit timezone marker.
+function parseUTC(isoString) {
+  if (!isoString) return null;
+  const hasTZ = /Z$|[+-]\d{2}:\d{2}$/.test(isoString);
+  return new Date(hasTZ ? isoString : isoString + "Z");
+}
+
 const WAIT_OPTIONS = [5, 10, 30, 60, 120];
 
 export default function AlertScreen({ alerts, onResolved, goToHome }) {
@@ -47,12 +57,12 @@ export default function AlertScreen({ alerts, onResolved, goToHome }) {
       <Text style={styles.name}>{item.visitor_name}</Text>
       <Text style={styles.purpose}>{item.purpose}</Text>
       <Text style={styles.arrived}>
-        Arrived: {new Date(item.arrived_at).toLocaleTimeString()}
+        Arrived: {parseUTC(item.arrived_at)?.toLocaleTimeString()}
       </Text>
 
       {item.host_response === "wait" && (
         <Text style={styles.waitBadge}>
-          You said: wait until {new Date(item.wait_until).toLocaleTimeString()}
+          You said: wait until {parseUTC(item.wait_until)?.toLocaleTimeString()}
         </Text>
       )}
 

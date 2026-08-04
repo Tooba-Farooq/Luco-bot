@@ -4,41 +4,96 @@
   <meta charset="UTF-8">
   <title>Visit Status</title>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 40px; background: #0f172a; color: #fff; }
-    #status { font-size: 20px; margin-top: 20px; }
-    #photo { width: 96px; height: 96px; border-radius: 48px; margin-top: 20px; }
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 40px;
+      background: #0f172a;
+      color: #fff;
+      transition: background 0.3s ease;
+    }
+    #status-banner {
+      max-width: 400px;
+      margin: 24px auto;
+      padding: 20px;
+      border-radius: 12px;
+      font-size: 18px;
+      line-height: 1.5;
+      background: #1e293b;
+      border: 1px solid #334155;
+    }
+    #status-banner.proceed { background: #14532d; border-color: #22c55e; }
+    #status-banner.wait { background: #713f12; border-color: #eab308; }
+    #status-banner.unavailable { background: #7f1d1d; border-color: #ef4444; }
+    #status-banner.error { background: #374151; border-color: #6b7280; }
+    #connecting { font-size: 16px; color: #94a3b8; margin-top: 20px; }
   </style>
 </head>
 <body>
   <h2>Your Visit Status</h2>
-  <div id="status">Connecting...</div>
-  <img id="photo" style="display:none;" />
+  <div id="connecting">Connecting...</div>
+  <div id="status-banner" style="display:none;"></div>
 
   <script>
-    const API_BASE = "wss://take-awaken-cactus.ngrok-free.dev";
+    // TODO: switch to the real backend before this works off a phone/QR scan —
+    // ws://127.0.0.1:8000 only works for same-machine local testing
+    const API_BASE = "ws://127.0.0.1:8000";
+
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
 
+    const connectingEl = document.getElementById("connecting");
+    const bannerEl = document.getElementById("status-banner");
+
+    function showBanner(text, stateClass) {
+      connectingEl.style.display = "none";
+      bannerEl.style.display = "block";
+      bannerEl.className = stateClass;
+      bannerEl.textContent = text;
+    }
+
+    function stateToClass(state) {
+      switch (state) {
+        case "PROCEED_TO_HOST": return "proceed";
+        case "HOST_ASKED_WAIT": return "wait";
+        case "HOST_UNAVAILABLE": return "unavailable";
+        default: return "error";
+      }
+    }
+
     if (!token) {
-      document.getElementById("status").textContent = "Missing status token.";
+      showBanner("Missing status token.", "error");
     } else {
       const ws = new WebSocket(`${API_BASE}/ws/status/${token}`);
 
       ws.onopen = () => {
-        document.getElementById("status").textContent = "Waiting for updates...";
+        connectingEl.textContent = "Waiting for updates...";
       };
 
       ws.onmessage = (event) => {
         console.log("Status update:", event.data);
-        document.getElementById("status").textContent = event.data;
+        try {
+          const data = JSON.parse(event.data);
+          // visitor_message is already a complete, human-readable sentence — display as-is
+          showBanner(data.visitor_message, stateToClass(data.state));
+        } catch (err) {
+          console.error("Failed to parse status message:", err);
+          showBanner("Received an unexpected update.", "error");
+        }
       };
 
       ws.onerror = () => {
-        document.getElementById("status").textContent = "Connection error.";
+        showBanner("Connection error. Please refresh the page.", "error");
       };
 
-      ws.onclose = () => {
-        document.getElementById("status").textContent += " (connection closed)";
+      ws.onclose = (event) => {
+        // 4404 = invalid/expired status token, per backend doc
+        if (event.code === 4404) {
+          showBanner("This visit link is invalid or has expired.", "error");
+        } else if (bannerEl.style.display === "none") {
+          // only show a generic closed message if we never got a real status
+          showBanner("Connection closed.", "error");
+        }
       };
     }
   </script>
