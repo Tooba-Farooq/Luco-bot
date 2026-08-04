@@ -66,26 +66,50 @@ export async function registerDevice(deviceToken, platform) {
   return response.json();
 }
 
+// Prevents concurrent refresh calls from racing each other and stepping
+// on a rotated refresh token (see refreshAccessToken below).
+let refreshInFlight = null;
+
 export async function refreshAccessToken() {
-  const refreshToken = await getRefreshToken();
-  if (!refreshToken) {
-    throw new Error('No refresh token available');
+  if (refreshInFlight) {
+    return refreshInFlight;
   }
 
-  const response = await fetch(`${BASE_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
+  refreshInFlight = (async () => {
+    const refreshToken = await getRefreshToken();
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
 
-  if (!response.ok) {
-    await clearTokens();
-    throw new Error('Refresh failed, session expired');
+    const response = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!response.ok) {
+      await clearTokens();
+      throw new Error('Refresh failed, session expired');
+    }
+
+    const data = await response.json();
+    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, data.access_token);
+
+    // If the backend rotates refresh tokens, persist the new one too —
+    // otherwise the next refresh attempt uses a stale/invalidated token
+    // and silently logs the user out after the next expiry.
+    if (data.refresh_token) {
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, data.refresh_token);
+    }
+
+    return data.access_token;
+  })();
+
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
   }
-
-  const data = await response.json();
-  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, data.access_token);
-  return data.access_token;
 }
 
 // getMe() defined below, after authFetch wrapper
