@@ -166,6 +166,11 @@ await registerDevice(pushToken, Platform.OS);
 
                         <Text style={styles.welcomeText}>Welcome to LucoBot</Text>
                         <Text style={styles.subtitle}>Admin Portal - Faculty Login</Text>
+                        {!keyboardVisible && (
+                            <Text style={styles.tagline}>
+                                LucoBot greets your guests at reception, so you never miss an arrival.
+                            </Text>
+                        )}
 
                         <View style={styles.formContainer}>
                             <TextInput

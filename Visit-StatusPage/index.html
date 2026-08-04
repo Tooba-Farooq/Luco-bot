@@ -4,34 +4,116 @@
   <meta charset="UTF-8">
   <title>Visit Status</title>
   <style>
+    * { box-sizing: border-box; }
     body {
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       text-align: center;
-      padding: 40px;
+      padding: 40px 20px;
       background: #0f172a;
       color: #fff;
-      transition: background 0.3s ease;
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
+
+    .robot {
+      width: 64px;
+      height: 64px;
+      background: #00bcd4;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      border: 3px solid #fff;
+      box-shadow: 0 0 20px rgba(0, 188, 212, 0.5);
+    }
+    .robot .eyes {
+      display: flex;
+      gap: 10px;
+    }
+    .robot .eye {
+      width: 8px;
+      height: 14px;
+      background: #0f172a;
+      border-radius: 4px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0 0 4px;
+      color: #fff;
+    }
+    .subheading {
+      font-size: 13px;
+      color: #64748b;
+      margin: 0 0 28px;
+    }
+
+    #connecting {
+      font-size: 15px;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00bcd4;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+
     #status-banner {
       max-width: 400px;
-      margin: 24px auto;
-      padding: 20px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
       border-radius: 12px;
       font-size: 18px;
-      line-height: 1.5;
+      font-weight: 500;
+      line-height: 1.6;
       background: #1e293b;
       border: 1px solid #334155;
+      transition: background 0.3s ease, border-color 0.3s ease;
     }
     #status-banner.proceed { background: #14532d; border-color: #22c55e; }
     #status-banner.wait { background: #713f12; border-color: #eab308; }
     #status-banner.unavailable { background: #7f1d1d; border-color: #ef4444; }
     #status-banner.error { background: #374151; border-color: #6b7280; }
-    #connecting { font-size: 16px; color: #94a3b8; margin-top: 20px; }
+
+    .status-icon {
+      font-size: 28px;
+      display: block;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
+  <div class="robot">
+    <div class="eyes">
+      <div class="eye"></div>
+      <div class="eye"></div>
+    </div>
+  </div>
+
   <h2>Your Visit Status</h2>
-  <div id="connecting">Connecting...</div>
+  <p class="subheading">LucoBot will update this page live</p>
+
+  <div id="connecting">
+    <span class="pulse-dot"></span>
+    Connecting...
+  </div>
   <div id="status-banner" style="display:none;"></div>
 
   <script>
@@ -45,11 +127,18 @@
     const connectingEl = document.getElementById("connecting");
     const bannerEl = document.getElementById("status-banner");
 
+    const ICONS = {
+      proceed: "✅",
+      wait: "⏳",
+      unavailable: "🚫",
+      error: "⚠️",
+    };
+
     function showBanner(text, stateClass) {
       connectingEl.style.display = "none";
       bannerEl.style.display = "block";
       bannerEl.className = stateClass;
-      bannerEl.textContent = text;
+      bannerEl.innerHTML = `<span class="status-icon">${ICONS[stateClass] || ICONS.error}</span>${text}`;
     }
 
     function stateToClass(state) {
@@ -67,14 +156,13 @@
       const ws = new WebSocket(`${API_BASE}/ws/status/${token}`);
 
       ws.onopen = () => {
-        connectingEl.textContent = "Waiting for updates...";
+        connectingEl.innerHTML = '<span class="pulse-dot"></span>Waiting for updates...';
       };
 
       ws.onmessage = (event) => {
         console.log("Status update:", event.data);
         try {
           const data = JSON.parse(event.data);
-          // visitor_message is already a complete, human-readable sentence — display as-is
           showBanner(data.visitor_message, stateToClass(data.state));
         } catch (err) {
           console.error("Failed to parse status message:", err);
@@ -87,11 +175,9 @@
       };
 
       ws.onclose = (event) => {
-        // 4404 = invalid/expired status token, per backend doc
         if (event.code === 4404) {
           showBanner("This visit link is invalid or has expired.", "error");
         } else if (bannerEl.style.display === "none") {
-          // only show a generic closed message if we never got a real status
           showBanner("Connection closed.", "error");
         }
       };

@@ -85,7 +85,11 @@ export default function Home({ goToLogin, goToAlerts })  {
       <Text style={styles.subtitle}>{employee?.employee_code}</Text>
 
       <View style={styles.idleBox}>
+        <Text style={styles.idleIcon}>👀</Text>
         <Text style={styles.idleText}>No active visitor alerts</Text>
+        <Text style={styles.idleSubtext}>
+          LucoBot will notify you the moment someone arrives
+        </Text>
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -142,14 +146,27 @@ const styles = StyleSheet.create({
   },
   idleBox: {
     marginTop: 40,
-    padding: 20,
+    padding: 24,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#1e293b",
+    alignItems: "center",
+    maxWidth: 320,
+  },
+  idleIcon: {
+    fontSize: 28,
+    marginBottom: 8,
   },
   idleText: {
     color: "#64748b",
     fontSize: 14,
+    fontWeight: "600",
+  },
+  idleSubtext: {
+    color: "#475569",
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: "center",
   },
   logoutButton: {
     marginTop: 48,

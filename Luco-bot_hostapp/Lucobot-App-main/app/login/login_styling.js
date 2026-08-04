@@ -66,6 +66,15 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         opacity: 0.8,
     },
+    tagline: {
+        color: '#666',
+        fontSize: moderateScale(12),
+        textAlign: 'center',
+        marginTop: verticalScale(-24),
+        marginBottom: verticalScale(32),
+        paddingHorizontal: scale(20),
+        lineHeight: moderateScale(17),
+    },
     formContainer: {
         width: '100%',
         maxWidth: 400,
