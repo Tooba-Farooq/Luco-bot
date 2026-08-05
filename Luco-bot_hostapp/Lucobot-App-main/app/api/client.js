@@ -161,6 +161,16 @@ export async function getPendingAlerts() {
   return response.json();
 }
 
+export async function getHostMessages() {
+  const response = await authFetch(`${BASE_URL}/host/messages`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch messages');
+  }
+
+  return response.json();
+}
+
 export async function respondToAlert(sessionId, response, waitMinutes) {
   const body = { session_id: sessionId, response };
   if (response === 'wait') {

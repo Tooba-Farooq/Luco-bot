@@ -6,6 +6,7 @@ import SplashScreen from './app/Splash-screen/splash_screen';
 import Home from './app/home-screen/home';
 import Login from './app/login/login';
 import AlertScreen from './app/alert-screen/alert';
+import MessagesScreen from './app/messages-screen/messages';
 
 // Show alerts as banners even while the app is in the foreground
 Notifications.setNotificationHandler({
@@ -20,6 +21,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('splash');
   const [currentUser, setCurrentUser] = useState(null);
   const [pendingAlerts, setPendingAlerts] = useState([]);
+  const [refreshKey, setRefreshKey] = useState(0);
   const notificationListener = useRef();
   const responseListener = useRef();
 
@@ -39,6 +41,7 @@ export default function App() {
       console.log('Notification received in foreground:', data);
       // Re-check pending alerts so the new one shows up if user is on home
       if (currentScreen === 'home' || currentScreen === 'alerts') {
+        setRefreshKey((k) => k + 1);
         setCurrentScreen('home'); // triggers Home's loadProfile to re-check pending alerts
       }
     });
@@ -67,7 +70,7 @@ export default function App() {
     setPendingAlerts(alerts);
     setCurrentScreen('alerts');
   };
-
+  const goToMessages = () => setCurrentScreen('messages');
   const handleAlertResolved = (sessionId) => {
     setPendingAlerts((prev) => prev.filter((a) => a.session_id !== sessionId));
   };
@@ -84,7 +87,9 @@ export default function App() {
       case 'login':
         return <Login goToHome={goToHome} />;
       case 'home':
-        return <Home goToLogin={logout} goToAlerts={goToAlerts} />;
+        return <Home key={refreshKey} goToLogin={logout} goToAlerts={goToAlerts} goToMessages={goToMessages} />;
+      case 'messages':
+        return <MessagesScreen goToHome={() => setCurrentScreen('home')} />;
       case 'alerts':
         return (
           <AlertScreen

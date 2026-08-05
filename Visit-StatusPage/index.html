@@ -1,16 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Visit Status</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visit Status | LucoBot</title>
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       text-align: center;
-      padding: 40px 20px;
+      padding: 32px 16px;
       background: #0f172a;
-      color: #fff;
+      color: #f8fafc;
       min-height: 100vh;
       margin: 0;
       display: flex;
@@ -19,113 +20,260 @@
       justify-content: center;
     }
 
+    .container {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
     .robot {
-      width: 64px;
-      height: 64px;
-      background: #00bcd4;
+      width: 72px;
+      height: 72px;
+      background: linear-gradient(135deg, #00bcd4, #0284c7);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 0 auto 20px;
-      border: 3px solid #fff;
-      box-shadow: 0 0 20px rgba(0, 188, 212, 0.5);
+      margin-bottom: 20px;
+      border: 3px solid #ffffff;
+      box-shadow: 0 0 24px rgba(0, 188, 212, 0.4);
     }
-    .robot .eyes {
-      display: flex;
-      gap: 10px;
-    }
-    .robot .eye {
-      width: 8px;
-      height: 14px;
-      background: #0f172a;
-      border-radius: 4px;
+    .robot .eyes { display: flex; gap: 12px; }
+    .robot .eye { 
+      width: 10px; 
+      height: 16px; 
+      background: #0f172a; 
+      border-radius: 5px; 
+      animation: blink 4s infinite;
     }
 
-    h2 {
-      font-size: 20px;
-      font-weight: 600;
-      margin: 0 0 4px;
-      color: #fff;
+    @keyframes blink {
+      0%, 96%, 100% { transform: scaleY(1); }
+      98% { transform: scaleY(0.1); }
     }
-    .subheading {
-      font-size: 13px;
-      color: #64748b;
-      margin: 0 0 28px;
-    }
+
+    h2 { font-size: 22px; font-weight: 700; margin: 0 0 6px; color: #f8fafc; }
+    .subheading { font-size: 14px; color: #94a3b8; margin: 0 0 28px; }
 
     #connecting {
       font-size: 15px;
-      color: #94a3b8;
+      color: #cbd5e1;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 10px;
+      background: #1e293b;
+      padding: 16px 24px;
+      border-radius: 30px;
+      border: 1px solid #334155;
     }
     .pulse-dot {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: #00bcd4;
       animation: pulse 1.2s ease-in-out infinite;
     }
     @keyframes pulse {
       0%, 100% { opacity: 0.3; transform: scale(0.8); }
-      50% { opacity: 1; transform: scale(1.1); }
+      50% { opacity: 1; transform: scale(1.2); }
     }
 
     #status-banner {
-      max-width: 400px;
       width: 100%;
-      margin: 0 auto;
       padding: 24px;
-      border-radius: 12px;
-      font-size: 18px;
+      border-radius: 16px;
+      font-size: 17px;
       font-weight: 500;
-      line-height: 1.6;
+      line-height: 1.5;
       background: #1e293b;
       border: 1px solid #334155;
-      transition: background 0.3s ease, border-color 0.3s ease;
+      transition: all 0.3s ease;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
     }
-    #status-banner.proceed { background: #14532d; border-color: #22c55e; }
-    #status-banner.wait { background: #713f12; border-color: #eab308; }
-    #status-banner.unavailable { background: #7f1d1d; border-color: #ef4444; }
-    #status-banner.error { background: #374151; border-color: #6b7280; }
+    #status-banner.proceed { background: #064e3b; border-color: #10b981; color: #ecfdf5; }
+    #status-banner.wait { background: #713f12; border-color: #f59e0b; color: #fffbeb; }
+    #status-banner.unavailable { background: #7c2d12; border-color: #ea580c; color: #fff7ed; }
+    #status-banner.error { background: #374151; border-color: #6b7280; color: #f9fafb; }
 
-    .status-icon {
-      font-size: 28px;
-      display: block;
-      margin-bottom: 10px;
+    .status-icon { font-size: 32px; display: block; margin-bottom: 12px; }
+
+    #message-panel {
+      width: 100%;
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 16px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      display: none;
+      text-align: left;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
     }
+    #message-panel.show { display: block; }
+    #message-panel h3 { font-size: 16px; margin: 0 0 14px; color: #f8fafc; text-align: center; }
+
+    .message-tabs { 
+      display: flex; 
+      gap: 8px; 
+      margin-bottom: 16px; 
+      background: #0f172a; 
+      padding: 4px; 
+      border-radius: 10px; 
+    }
+    .message-tab {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      border-radius: 8px;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .message-tab.active {
+      background: #00bcd4;
+      color: #0f172a;
+      font-weight: 600;
+    }
+
+    #messageText {
+      width: 100%;
+      min-height: 90px;
+      padding: 12px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      margin-bottom: 14px;
+      outline: none;
+    }
+    #messageText:focus { border-color: #00bcd4; }
+
+    #recordSection { display: none; text-align: center; margin-bottom: 14px; }
+    #recordSection.show { display: block; }
+    
+    .record-btn {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #ef4444;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin: 10px 0;
+      color: white;
+      transition: transform 0.2s ease;
+    }
+    .record-btn:active { transform: scale(0.95); }
+    .record-btn.recording { animation: recordPulse 1s ease-in-out infinite; }
+    
+    @keyframes recordPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+      50% { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
+    }
+
+    #recordStatus { font-size: 13px; color: #94a3b8; margin-top: 6px; }
+    #audioPreview { width: 100%; margin-top: 10px; display: none; }
+
+    #sendMessageBtn {
+      width: 100%;
+      padding: 12px;
+      background: #00bcd4;
+      border: none;
+      border-radius: 10px;
+      color: #0f172a;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    #sendMessageBtn:hover { background: #22d3ee; }
+    #sendMessageBtn:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+
+    #messageConfirmed {
+      display: none;
+      text-align: center;
+      color: #4ade80;
+      font-size: 14px;
+      font-weight: 500;
+      margin-top: 12px;
+    }
+    #messageConfirmed.show { display: block; }
   </style>
 </head>
 <body>
-  <div class="robot">
-    <div class="eyes">
-      <div class="eye"></div>
-      <div class="eye"></div>
+  <div class="container">
+    <div class="robot">
+      <div class="eyes">
+        <div class="eye"></div>
+        <div class="eye"></div>
+      </div>
+    </div>
+
+    <h2>Your Visit Status</h2>
+    <p class="subheading">LucoBot will update this page live</p>
+
+    <div id="connecting">
+      <span class="pulse-dot"></span>
+      <span>Connecting...</span>
+    </div>
+    <div id="status-banner" style="display:none;"></div>
+
+    <div id="message-panel">
+      <h3>Leave a message for your host</h3>
+      <div class="message-tabs">
+        <button class="message-tab active" id="tabType">Type</button>
+        <button class="message-tab" id="tabRecord">Record Voice</button>
+      </div>
+
+      <textarea id="messageText" placeholder="Type your message here..."></textarea>
+
+      <div id="recordSection">
+        <button class="record-btn" id="recordBtn" aria-label="Record Voice">🎤</button>
+        <div id="recordStatus">Tap to start recording</div>
+        <audio id="audioPreview" controls></audio>
+      </div>
+
+      <button id="sendMessageBtn">Send Message</button>
+      <div id="messageConfirmed">✓ Message delivered successfully!</div>
     </div>
   </div>
 
-  <h2>Your Visit Status</h2>
-  <p class="subheading">LucoBot will update this page live</p>
-
-  <div id="connecting">
-    <span class="pulse-dot"></span>
-    Connecting...
-  </div>
-  <div id="status-banner" style="display:none;"></div>
-
   <script>
-    // TODO: switch to the real backend before this works off a phone/QR scan —
-    // ws://127.0.0.1:8000 only works for same-machine local testing
-    const API_BASE = "ws://127.0.0.1:8000";
+    const API_BASE = window.location.hostname === "localhost"
+      ? "ws://localhost:8000"
+      : "wss://take-awaken-cactus.ngrok-free.dev";
+
+    const HTTP_BASE = window.location.hostname === "localhost"
+      ? "http://localhost:8000"
+      : "https://take-awaken-cactus.ngrok-free.dev";
 
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
 
     const connectingEl = document.getElementById("connecting");
     const bannerEl = document.getElementById("status-banner");
+    const messagePanel = document.getElementById("message-panel");
+    const messageText = document.getElementById("messageText");
+    const sendMessageBtn = document.getElementById("sendMessageBtn");
+    const messageConfirmed = document.getElementById("messageConfirmed");
+    const tabType = document.getElementById("tabType");
+    const tabRecord = document.getElementById("tabRecord");
+    const recordSection = document.getElementById("recordSection");
+    const recordBtn = document.getElementById("recordBtn");
+    const recordStatus = document.getElementById("recordStatus");
+    const audioPreview = document.getElementById("audioPreview");
 
     const ICONS = {
       proceed: "✅",
@@ -133,6 +281,13 @@
       unavailable: "🚫",
       error: "⚠️",
     };
+
+    let currentSessionId = null;
+    let mode = "type";
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let recordedBlob = null;
+    let isRecording = false;
 
     function showBanner(text, stateClass) {
       connectingEl.style.display = "none";
@@ -150,37 +305,177 @@
       }
     }
 
+    function updateMessagePanelVisibility(state) {
+      if (state === "HOST_UNAVAILABLE") {
+        messagePanel.classList.add("show");
+      } else {
+        messagePanel.classList.remove("show");
+      }
+    }
+
+    // Tab switching
+    tabType.addEventListener("click", () => {
+      mode = "type";
+      tabType.classList.add("active");
+      tabRecord.classList.remove("active");
+      messageText.style.display = "block";
+      recordSection.classList.remove("show");
+    });
+
+    tabRecord.addEventListener("click", () => {
+      mode = "record";
+      tabRecord.classList.add("active");
+      tabType.classList.remove("active");
+      messageText.style.display = "none";
+      recordSection.classList.add("show");
+    });
+
+    // Recording
+    recordBtn.addEventListener("click", async () => {
+      if (isRecording) {
+        mediaRecorder.stop();
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          recordedBlob = new Blob(recordedChunks, { type: "audio/webm" });
+          isRecording = false;
+          recordBtn.classList.remove("recording");
+          recordStatus.textContent = "Recording ready — preview below or tap Send";
+          audioPreview.src = URL.createObjectURL(recordedBlob);
+          audioPreview.style.display = "block";
+          stream.getTracks().forEach((t) => t.stop());
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        recordBtn.classList.add("recording");
+        recordStatus.textContent = "Recording... tap to stop";
+        audioPreview.style.display = "none";
+      } catch (err) {
+        console.error("Mic access failed:", err);
+        recordStatus.textContent = "Couldn't access microphone. Please allow permissions.";
+      }
+    });
+
+    // Sending message
+    sendMessageBtn.addEventListener("click", async () => {
+      if (!currentSessionId) {
+        recordStatus.textContent = "No active session yet — please wait.";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("session_id", currentSessionId);
+
+      if (mode === "type") {
+        const text = messageText.value.trim();
+        if (!text) {
+          messageText.focus();
+          return;
+        }
+        formData.append("text", text);
+      } else {
+        if (!recordedBlob) {
+          recordStatus.textContent = "Please record a message first.";
+          return;
+        }
+        formData.append("audio", recordedBlob, "message.webm");
+      }
+
+      sendMessageBtn.disabled = true;
+      sendMessageBtn.textContent = "Sending...";
+
+      try {
+        const res = await fetch(`${HTTP_BASE}/visitor/message`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (res.ok) {
+          messageConfirmed.classList.add("show");
+          messageText.value = "";
+          recordedBlob = null;
+          audioPreview.style.display = "none";
+          recordStatus.textContent = "Tap to start recording";
+          setTimeout(() => messageConfirmed.classList.remove("show"), 5000);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          recordStatus.textContent = data.detail || "Failed to send message.";
+        }
+      } catch (err) {
+        console.error("Failed to send message:", err);
+        recordStatus.textContent = "Connection error — try again.";
+      } finally {
+        sendMessageBtn.disabled = false;
+        sendMessageBtn.textContent = "Send Message";
+      }
+    });
+
+    // WebSocket Connection handling
     if (!token) {
-      showBanner("Missing status token.", "error");
+      showBanner("Missing or invalid status token.", "error");
     } else {
-      const ws = new WebSocket(`${API_BASE}/ws/status/${token}`);
+      function connectWS() {
+        const ws = new WebSocket(`${API_BASE}/ws/status/${token}`);
 
-      ws.onopen = () => {
-        connectingEl.innerHTML = '<span class="pulse-dot"></span>Waiting for updates...';
-      };
+        ws.onopen = () => {
+          connectingEl.innerHTML = '<span class="pulse-dot"></span><span>Waiting for updates...</span>';
+        };
 
-      ws.onmessage = (event) => {
-        console.log("Status update:", event.data);
-        try {
-          const data = JSON.parse(event.data);
-          showBanner(data.visitor_message, stateToClass(data.state));
-        } catch (err) {
-          console.error("Failed to parse status message:", err);
-          showBanner("Received an unexpected update.", "error");
+       ws.onmessage = (event) => {
+    try {
+        const data = JSON.parse(event.data);
+
+        console.log("Received WebSocket data:", data);
+        console.log("session_id =", data.session_id);
+
+        if (data.session_id) {
+            currentSessionId = data.session_id;
+            console.log("Current session ID:", currentSessionId);
         }
-      };
 
-      ws.onerror = () => {
-        showBanner("Connection error. Please refresh the page.", "error");
-      };
-
-      ws.onclose = (event) => {
-        if (event.code === 4404) {
-          showBanner("This visit link is invalid or has expired.", "error");
-        } else if (bannerEl.style.display === "none") {
-          showBanner("Connection closed.", "error");
+        if (data.host_response === null || data.host_response === undefined) {
+            const who = data.host_name || "your host";
+            bannerEl.style.display = "none";
+            connectingEl.style.display = "flex";
+            connectingEl.innerHTML = `<span class="pulse-dot"></span><span>Waiting for ${who} to respond...</span>`;
+            return;
         }
-      };
+
+        const message = data.visitor_message || "Waiting for your host to respond...";
+        showBanner(message, stateToClass(data.state));
+        updateMessagePanelVisibility(data.state);
+
+    } catch (err) {
+        console.error("Failed to parse status message:", err);
+        showBanner("Received an unexpected update.", "error");
+    }
+};
+
+        ws.onerror = () => {
+          showBanner("Connection error. Reconnecting...", "error");
+        };
+
+        ws.onclose = (event) => {
+          if (event.code === 4404) {
+            showBanner("This visit link is invalid or has expired.", "error");
+          } else {
+            // Reconnect attempt after delay
+            setTimeout(connectWS, 3000);
+          }
+        };
+      }
+
+      connectWS();
     }
   </script>
 </body>

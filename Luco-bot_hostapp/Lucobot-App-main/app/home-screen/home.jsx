@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { getMe, getPendingAlerts, logout as logoutClient } from "../api/client";
 
-export default function Home({ goToLogin, goToAlerts })  {
+export default function Home({ goToLogin, goToAlerts, goToMessages })  {
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -91,7 +91,9 @@ export default function Home({ goToLogin, goToAlerts })  {
           LucoBot will notify you the moment someone arrives
         </Text>
       </View>
-
+      <TouchableOpacity style={styles.messagesButton} onPress={goToMessages}>
+        <Text style={styles.messagesButtonText}>View Messages</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutButtonText}>Log Out</Text>
       </TouchableOpacity>
@@ -168,6 +170,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: "center",
   },
+  messagesButton: {
+  marginTop: 16,
+  paddingVertical: 12,
+  paddingHorizontal: 32,
+  borderRadius: 8,
+  backgroundColor: "#1e293b",
+  borderWidth: 1,
+  borderColor: "#334155",
+},
+messagesButtonText: { color: "#00bcd4", fontWeight: "600" },
   logoutButton: {
     marginTop: 48,
     paddingVertical: 12,
