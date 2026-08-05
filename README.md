@@ -152,7 +152,8 @@ This entire behavior is Unity-side — the backend has no way to know when someo
   "matched_host": {"id": 3, "name": "Ahmed Khan", "floor_room": "3rd Floor"} | null,
   "host_candidates": [{"id": 3, "name": "..."}, ...] | null,
   "audio_base64": "<base64 mp3>" | null,
-  "audio_key": "no_match_with_suggestions" | null
+   "audio_key": "no_match_with_suggestions" | null,
+   "qr_base64": "<base64 png>" | null
 }
 ```
 
@@ -167,6 +168,8 @@ Once the visitor states their purpose, the backend checks whether the original `
 
 **Unity does not need to track or check which case applies** — just follow whatever `state` comes back in the response, same as everywhere else in this flow.
 
+When the session reaches `READY_FOR_HANDOFF`, the response also includes `qr_base64`, which is the QR code the tablet should display so the visitor can continue on their phone.
+
 ### State reference — what Unity should show/do
 
 | `state`             | Meaning                                                                                                                                                                                                                        | Unity behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -176,7 +179,7 @@ Once the visitor states their purpose, the backend checks whether the original `
 | `AWAITING_NAME`     | Purpose captured, unknown visitor — now asking for their name                                                                                                                                                                  | Play audio, then record next response. This response is passed through the name-specific transcription flow before the backend asks for confirmation.                                                                                                                                                                                                                                                                                                                                                      |
 | `NAME_CONFIRMATION` | Backend heard a name — visitor confirms or edits it                                                                                                                                                                            | Show name input **pre-filled with `heard_text`**, editable. Submit button calls `/session/submit-name` regardless of whether text was changed.                                                                                                                                                                                                                                                                                                                                                             |
 | `AWAITING_PHOTO`    | Name submitted — now capturing the visitor's photo                                                                                                                                                                             | Open camera view. See `/session/photo-frame` and `/session/capture-photo` below.                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `READY_FOR_HANDOFF` | Purpose (and name/photo, if unknown) fully captured                                                                                                                                                                            | _(Next steps — QR handoff / host alert — not yet built)_                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `READY_FOR_HANDOFF` | Purpose (and name/photo, if unknown) fully captured; hand off to the visitor's phone via QR code                                                                                                                               | Show the QR code from `qr_base64` on the tablet and let the visitor scan it to continue on their phone. Keep the session open until the visitor status page takes over.                                                                                                                                                                                                                                                                                                                                    |
 | `QUERY_ANSWERED`    | General question was answered from the knowledge prompt                                                                                                                                                                        | Play `answer_text`, then continue conversation                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `FALLBACK`          | Question couldn't be answered                                                                                                                                                                                                  | Play fallback audio (`didnt_catch_that`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
@@ -243,7 +246,7 @@ Poll this endpoint continuously (same cadence as `/detect`, roughly every 200–
 
 Called once `ready_to_capture` is `true` from `/session/photo-frame`. Backend re-verifies face quality server-side (even though the client already saw green — never trust client-side checks alone), runs a blur check, and if everything passes: saves the photo, generates a face embedding, creates the `Visitor` record, and creates the `VisitLog` record for this visit (see note below on `VisitLog` timing).
 
-**On success** → moves to `READY_FOR_HANDOFF`, returns the next prompt.
+**On success** → moves to `READY_FOR_HANDOFF`, returns the QR handoff payload, and includes `qr_base64` for the tablet to display.
 
 **On failure** (blurry, face check failed server-side) → returns `409 Conflict` with a reason. Unity should show a brief retry message and resume polling `/session/photo-frame`.
 
@@ -281,7 +284,7 @@ Registers a new employee and stores their profile details for admin/host-directo
   "floor_room": "3rd Floor, Room 204",
   "phone_number": "0300-1234567",
   "email": "ahmed@company.com",
-   "photo_path": "employee_photos/a1b2c3d4.jpg"
+  "photo_path": "employee_photos/a1b2c3d4.jpg"
 }
 ```
 

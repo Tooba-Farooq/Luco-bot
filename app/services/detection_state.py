@@ -27,6 +27,7 @@ class DetectionState:
         self.__init__()
 
     def start_session(self):
+        self.reset()
         self.session_id = str(uuid.uuid4())
         self.state = "AWAITING_INTENT"
         return self.session_id

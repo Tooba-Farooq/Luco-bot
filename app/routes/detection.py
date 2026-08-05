@@ -65,6 +65,7 @@ async def detect(frame: UploadFile = File(...), db: Session = Depends(get_db)):
         )
     else:
         detection_state.recognized_name = None
+        detection_state.visitor_id = None
         return DetectionResponse(
             status=status, session_id=session_id,
             face_forward=True, forward_duration=duration,

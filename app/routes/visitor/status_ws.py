@@ -49,4 +49,4 @@ async def visitor_status_socket(websocket: WebSocket, status_token: str, db: Ses
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        manager.disconnect(status_token)
+        manager.disconnect(status_token, websocket)

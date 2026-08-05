@@ -10,18 +10,22 @@ class ConnectionManager:
         await websocket.accept()
         self._connections[status_token] = websocket
 
-    def disconnect(self, status_token: str):
-        self._connections.pop(status_token, None)
+    def disconnect(self, status_token: str, websocket: WebSocket = None):
+        # only remove if this is still the currently-registered socket for the token —
+        # prevents a stale/delayed disconnect from a superseded connection wiping out
+        # a newer, live one
+        if websocket is None or self._connections.get(status_token) is websocket:
+            self._connections.pop(status_token, None)
 
     async def send_update(self, status_token: str, payload: dict):
         websocket = self._connections.get(status_token)
         if websocket is None:
-            return False  # visitor's page isn't connected (closed tab, not yet opened, etc.) — not an error
+            return False
         try:
             await websocket.send_json(payload)
             return True
         except Exception:
-            self.disconnect(status_token)
+            self.disconnect(status_token, websocket)
             return False
 
 
