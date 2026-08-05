@@ -20,6 +20,7 @@ public class SessionResponse
     public HostCandidate[] host_candidates;
     public string audio_base64;
     public string audio_key;
+    public string qr_base64; // base64 PNG, present when state == "READY_FOR_HANDOFF"
 }
 
 [System.Serializable]

@@ -20,7 +20,7 @@ public class FaceDetectionService : MonoBehaviour
 {
     [Header("Backend")]
     // FIXED: Corrected double colon typo "::8000" to ":8000"
-    public string baseUrl = "http://192.168.100.141:8000"; 
+    public string baseUrl = "https://take-awaken-cactus.ngrok-free.dev"; 
 
     [Header("References")]
     public WebCamTexture webcamTexture;
@@ -81,6 +81,11 @@ public class FaceDetectionService : MonoBehaviour
         using (UnityWebRequest request = UnityWebRequest.Post($"{baseUrl}/detect", form))
         {
             yield return request.SendWebRequest();
+            if (!isPolling)
+            {
+                Debug.Log("Dropped stale /detect response — polling was stopped mid-request.");
+                yield break;
+            }
 
             if (request.result == UnityWebRequest.Result.Success)
             {

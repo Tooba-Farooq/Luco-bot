@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.Networking;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
@@ -18,7 +17,6 @@ public class QRCodeScreen : MonoBehaviour
     void OnEnable()
     {
         string hostName = flowManager.Session.hostName;
-        string visitorName = flowManager.Session.visitorName;
 
         string spokenMessage = $"I am notifying {hostName}. Please scan this code — further updates will be sent to your phone.";
         messageText.text = spokenMessage;
@@ -29,28 +27,38 @@ public class QRCodeScreen : MonoBehaviour
         if (face != null)
             face.SetExpression(FaceExpression.Success);
 
-        string dummyData = System.Uri.EscapeDataString($"Visit-{visitorName}-{System.DateTime.Now.Ticks}");
-        string url = $"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={dummyData}";
-        qrImage.texture = staticQRFallback;
+        string qrBase64 = flowManager.Session.qrBase64;
+
+        if (!string.IsNullOrEmpty(qrBase64))
+        {
+            Texture2D tex = DecodeBase64ToTexture(qrBase64);
+            qrImage.texture = tex != null ? tex : staticQRFallback;
+        }
+        else
+        {
+            Debug.LogWarning("No qr_base64 in session response — using static fallback.");
+            qrImage.texture = staticQRFallback;
+        }
 
         StartCoroutine(ReturnToIdleAfterDelay());
     }
 
-    IEnumerator FetchQRCode(string url)
+    private Texture2D DecodeBase64ToTexture(string base64)
     {
-        using (UnityWebRequest www = UnityWebRequestTexture.GetTexture(url))
+        try
         {
-            yield return www.SendWebRequest();
+            byte[] bytes = System.Convert.FromBase64String(base64);
+            Texture2D tex = new Texture2D(2, 2); // size gets replaced by LoadImage
+            if (tex.LoadImage(bytes))
+                return tex;
 
-            if (www.result == UnityWebRequest.Result.Success)
-            {
-                Texture2D tex = DownloadHandlerTexture.GetContent(www);
-                qrImage.texture = tex;
-            }
-            else
-            {
-                Debug.LogWarning("QR fetch failed: " + www.error);
-            }
+            Debug.LogWarning("QR base64 decoded but LoadImage failed.");
+            return null;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("Failed to decode QR base64: " + e.Message);
+            return null;
         }
     }
 

@@ -11,6 +11,7 @@ public class VisitorSession
     public int alertRetryCount = 0;
     public bool hostAvailable;
     public string message;
+    public string qrBase64;
 
     public void Reset()
     {
@@ -22,5 +23,6 @@ public class VisitorSession
         alertRetryCount = 0;
         hostAvailable = false;
         message = null;
+        qrBase64 = null;
     }
 }
