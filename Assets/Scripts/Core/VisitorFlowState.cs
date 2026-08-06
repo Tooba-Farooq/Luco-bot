@@ -1,24 +1,56 @@
+
 public enum VisitorFlowState
 {
     Idle,
+
     DetectingPerson,
+
     FaceRecognition,
+
     GreetKnownVisitor,
-    CollectName,              // NOTE: repurposed as "AskVisitorName" for hardcoded demo flow
+
+    CollectName,
+
     ConfirmSpelling,
+
     CapturePhoto,
+
     AskPurpose,
+
     IntentBranch,
+
     GeneralQuery,
-    MeetSomeone_EnterHostName,   // NOTE: repurposed as "AskHostName"
-    MeetSomeone_HostLookup,      // NOTE: repurposed as "ConfirmHostName"
-    MeetSomeone_ShowSimilarNames,// NOTE: repurposed as "QRCode screen"
+
+    // Conversation screen — asking/receiving host name
+    MeetSomeone_EnterHostName,
+
+    // Conversation screen — host lookup/confirmation
+    MeetSomeone_HostLookup,
+
+    // Standalone host candidates screen
+    HostCandidatesSelection,
+
+    // QR code / handoff screen
+    MeetSomeone_ShowSimilarNames,
+
+    // Conversation screen — purpose
     MeetSomeone_EnterPurpose,
+
+    // Standalone visitor name confirmation screen
+    NameConfirmation,
+
     AlertingHost,
+
     WaitingHostResponse,
+
     HostUnavailable,
+
     HostAccepted,
+
     VisitorWaiting,
+
     RecordMessage,
+
     VisitLogged
 }
+

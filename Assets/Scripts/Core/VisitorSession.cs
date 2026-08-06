@@ -12,6 +12,7 @@ public class VisitorSession
     public bool hostAvailable;
     public string message;
     public string qrBase64;
+    public HostCandidate[] hostCandidates; // NEW — set by ConversationScreen, read by HostCandidatesScreen
 
     public void Reset()
     {
@@ -24,5 +25,6 @@ public class VisitorSession
         hostAvailable = false;
         message = null;
         qrBase64 = null;
+        hostCandidates = null;
     }
 }

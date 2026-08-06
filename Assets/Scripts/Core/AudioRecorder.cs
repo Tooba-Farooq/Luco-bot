@@ -70,27 +70,40 @@ public class AudioRecorder : MonoBehaviour
     }
 
     private IEnumerator RecordRoutine(Action<byte[]> onComplete)
+{
+    isRecording = true;
+    recordingClip = Microphone.Start(micDevice, false, Mathf.CeilToInt(maxRecordingLength), sampleRate);
+
+    // wait for mic to actually start
+    while (Microphone.GetPosition(micDevice) <= 0) yield return null;
+
+    float elapsed = 0f;
+    float silenceTimer = 0f;
+    bool speechDetected = false;
+    float[] sampleWindow = new float[128];
+
+    const int safetyMargin = 256;      // stay this many samples behind the write head
+    const float pollInterval = 0.05f;  // check volume every 50ms instead of every frame
+    float pollTimer = 0f;
+
+    while (elapsed < maxRecordingLength)
     {
-        isRecording = true;
-        recordingClip = Microphone.Start(micDevice, false, Mathf.CeilToInt(maxRecordingLength), sampleRate);
+        pollTimer += Time.deltaTime;
 
-        // wait for mic to actually start
-        while (Microphone.GetPosition(micDevice) <= 0) yield return null;
-
-        float elapsed = 0f;
-        float silenceTimer = 0f;
-        bool speechDetected = false;
-        float[] sampleWindow = new float[128];
-
-        while (elapsed < maxRecordingLength)
+        if (pollTimer >= pollInterval)
         {
-            int micPos = Microphone.GetPosition(micDevice) - sampleWindow.Length;
-            if (micPos >= 0)
+            pollTimer = 0f;
+
+            int micPos = Microphone.GetPosition(micDevice) - sampleWindow.Length - safetyMargin;
+            int clipSamples = recordingClip.samples;
+
+            if (micPos >= 0 && micPos + sampleWindow.Length <= clipSamples)
             {
                 recordingClip.GetData(sampleWindow, micPos);
                 float volume = 0f;
                 foreach (float s in sampleWindow) volume += Mathf.Abs(s);
                 volume /= sampleWindow.Length;
+
                 if (volume > silenceThreshold)
                 {
                     speechDetected = true;
@@ -98,33 +111,34 @@ public class AudioRecorder : MonoBehaviour
                 }
                 else if (speechDetected)
                 {
-                    silenceTimer += Time.deltaTime;
+                    silenceTimer += pollInterval;
                     if (silenceTimer >= silenceDurationToStop && elapsed >= minRecordingLength)
                         break;
                 }
             }
-
-            elapsed += Time.deltaTime;
-            yield return null;
         }
 
-        int finalPos = Microphone.GetPosition(micDevice);
-        Microphone.End(micDevice);
-        isRecording = false;
-        activeRecordCoroutine = null;
-
-        if (finalPos <= 0)
-        {
-            onComplete?.Invoke(null);
-            yield break;
-        }
-
-        float[] finalSamples = new float[finalPos];
-        recordingClip.GetData(finalSamples, 0);
-
-        byte[] wavBytes = EncodeToWav(finalSamples, sampleRate, 1);
-        onComplete?.Invoke(wavBytes);
+        elapsed += Time.deltaTime;
+        yield return null;
     }
+
+    int finalPos = Microphone.GetPosition(micDevice);
+    Microphone.End(micDevice);
+    isRecording = false;
+    activeRecordCoroutine = null;
+
+    if (finalPos <= 0)
+    {
+        onComplete?.Invoke(null);
+        yield break;
+    }
+
+    float[] finalSamples = new float[finalPos];
+    recordingClip.GetData(finalSamples, 0);
+
+    byte[] wavBytes = EncodeToWav(finalSamples, sampleRate, 1);
+    onComplete?.Invoke(wavBytes);
+}
 
     private byte[] EncodeToWav(float[] samples, int sampleRate, int channels)
     {

@@ -40,7 +40,7 @@ public class BackendConfig : MonoBehaviour
 
     private void ApplyIp(string ip)
     {
-        detectionService.baseUrl = $"http://{ip}:8000";
+        detectionService.baseUrl = $"https://{ip}";
         Debug.Log("Backend URL set to: " + detectionService.baseUrl);
     }
 }

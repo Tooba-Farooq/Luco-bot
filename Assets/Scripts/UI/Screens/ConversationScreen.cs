@@ -1,249 +1,355 @@
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
-using System.Collections.Generic;
 
 public class ConversationScreen : MonoBehaviour
 {
+    [Header("UI Text & Indicators")]
     public TextMeshProUGUI heardText;
     public GameObject listeningIndicator;
-    public GameObject hostCandidatesPanel;
-    public Transform hostCandidatesContainer;
-    public GameObject hostCandidateButtonPrefab;
-    public Button confirmHostButton;
-    public Button cancelHostButton;
-    public GameObject nameConfirmationPanel;
-    public TMP_InputField nameInputField;
-    public Button submitNameButton;
+
+    [Header("Flow")]
     public VisitorFlowManager flowManager;
     public FaceExpressionController face;
 
-    private int selectedCandidateId = -1;
-    private GameObject selectedCandidateButtonObj = null;
-    private readonly Color selectedColor = new Color(0.75f, 0.85f, 1f);
-    private Color defaultCandidateColor = Color.white;
+    private bool isStartingRecording = false;
+
+    // =========================================================
+    // ENABLE
+    // =========================================================
 
     void OnEnable()
     {
-        SessionManager.Instance.OnSessionUpdate += HandleSessionUpdate;
-        SessionManager.Instance.OnRecordingFailed += HandleRecordingFailed;
-        SessionManager.Instance.OnReadyToSpeak += HandleReadyToSpeak;
-        SessionManager.Instance.OnRobotSpeaking += HandleRobotSpeakingForIndicator;
+        Debug.Log(
+            "[ConversationScreen] ENABLED"
+        );
 
-        if (confirmHostButton != null)
-            confirmHostButton.onClick.AddListener(OnConfirmHost);
-        if (cancelHostButton != null)
-            cancelHostButton.onClick.AddListener(OnCancelHost);
+        isStartingRecording = false;
 
-        ResetScreen();
+        if (SessionManager.Instance != null)
+        {
+            SessionManager.Instance.OnSessionUpdate +=
+                HandleSessionUpdate;
+
+            SessionManager.Instance.OnRecordingFailed +=
+                HandleRecordingFailed;
+
+            SessionManager.Instance.OnReadyToSpeak +=
+                HandleReadyToSpeak;
+
+            SessionManager.Instance.OnRobotSpeaking +=
+                HandleRobotSpeakingForIndicator;
+        }
+
+        // Do NOT check IsResponseAudioActive.
+        // Your SessionManager does not have that property.
+        //
+        // SessionManager already sends OnSessionUpdate only
+        // AFTER response audio has finished.
         StartListening();
     }
+
+    // =========================================================
+    // DISABLE
+    // =========================================================
 
     void OnDisable()
     {
-        // Stop any recording/send cycle still in flight so a late result
-        // can't reach a session that's already moved past this screen
-        // (this is what was causing "Not expecting audio in state: READY_FOR_HANDOFF").
+        Debug.Log(
+            "[ConversationScreen] DISABLED"
+        );
+
         if (SessionManager.Instance != null)
+        {
             SessionManager.Instance.CancelPendingRecording();
 
-        SessionManager.Instance.OnSessionUpdate -= HandleSessionUpdate;
-        SessionManager.Instance.OnRecordingFailed -= HandleRecordingFailed;
-        SessionManager.Instance.OnReadyToSpeak -= HandleReadyToSpeak;
-        SessionManager.Instance.OnRobotSpeaking -= HandleRobotSpeakingForIndicator;
+            SessionManager.Instance.OnSessionUpdate -=
+                HandleSessionUpdate;
 
-        if (confirmHostButton != null)
-            confirmHostButton.onClick.RemoveListener(OnConfirmHost);
-        if (cancelHostButton != null)
-            cancelHostButton.onClick.RemoveListener(OnCancelHost);
+            SessionManager.Instance.OnRecordingFailed -=
+                HandleRecordingFailed;
+
+            SessionManager.Instance.OnReadyToSpeak -=
+                HandleReadyToSpeak;
+
+            SessionManager.Instance.OnRobotSpeaking -=
+                HandleRobotSpeakingForIndicator;
+        }
+
+        isStartingRecording = false;
+
+        if (listeningIndicator != null)
+            listeningIndicator.SetActive(false);
     }
 
-    void ResetScreen()
-    {
-        hostCandidatesPanel.SetActive(false);
-        nameConfirmationPanel.SetActive(false);
-        listeningIndicator.SetActive(false);
-        heardText.text = "";
-        selectedCandidateId = -1;
-        selectedCandidateButtonObj = null;
-        SetConfirmCancelInteractable(false);
-    }
+    // =========================================================
+    // START LISTENING
+    // =========================================================
 
-    void SetConfirmCancelInteractable(bool interactable)
+    private void StartListening()
     {
-        if (confirmHostButton != null)
-            confirmHostButton.interactable = interactable;
-        if (cancelHostButton != null)
-            cancelHostButton.interactable = interactable;
-    }
+        if (!isActiveAndEnabled)
+            return;
 
-    void StartListening()
-    {
+        if (isStartingRecording)
+            return;
+
+        if (SessionManager.Instance == null)
+            return;
+
+        isStartingRecording = true;
+
+        Debug.Log(
+            "[ConversationScreen] " +
+            "Starting recording."
+        );
+
         SessionManager.Instance.RecordAndSend();
+
+        isStartingRecording = false;
     }
 
-    void HandleReadyToSpeak()
+    // =========================================================
+    // READY
+    // =========================================================
+
+    private void HandleReadyToSpeak()
     {
-        listeningIndicator.SetActive(true);
+        if (!isActiveAndEnabled)
+            return;
+
+        if (listeningIndicator != null)
+            listeningIndicator.SetActive(true);
+
+        Debug.Log(
+            "[ConversationScreen] " +
+            "READY TO SPEAK"
+        );
     }
 
-    void HandleSessionUpdate(SessionResponse response)
+    // =========================================================
+    // SESSION UPDATE
+    // =========================================================
+
+    private void HandleSessionUpdate(
+        SessionResponse response)
     {
-        if (!isActiveAndEnabled) return;
-
-        listeningIndicator.SetActive(false);
-        heardText.text = string.IsNullOrEmpty(response.heard_text) ? "" : $"You said: {response.heard_text}";
-
-        switch (response.state)
+        if (!isActiveAndEnabled ||
+            response == null)
         {
-            case "HOST_SELECTION":
-            case "HOST_SUGGESTIONS":
-                ShowHostCandidates(response.host_candidates);
-                break;
-
-            case "NAME_CONFIRMATION":
-                ShowNameConfirmation(response.heard_text);
-                break;
-
-            case "AWAITING_PURPOSE":
-            case "AWAITING_NAME":
-            case "AWAITING_HOST_NAME":
-            case "AWAITING_INTENT":
-            case "ANYTHING_ELSE":
-                StartListening();
-                break;
-
-            case "QUERY_ANSWERED":
-                StartListening();
-                break;
-
-            case "FALLBACK":
-                StartListening();
-                break;
-
-            case "READY_FOR_HANDOFF":
-                if (response.matched_host != null && flowManager.Session != null)
-                    flowManager.Session.hostName = response.matched_host.name;
-
-                if (flowManager.Session != null)
-                    flowManager.Session.qrBase64 = response.qr_base64;
-
-                flowManager.GoTo(VisitorFlowState.MeetSomeone_ShowSimilarNames);
-                break;
-
-            case "AWAITING_PHOTO":
-                if (response.matched_host != null && flowManager.Session != null)
-                    flowManager.Session.hostName = response.matched_host.name;
-
-                flowManager.GoTo(VisitorFlowState.CapturePhoto);
-                break;
-            default:
-                Debug.LogWarning("Unhandled session state:" + response.state);
-                heardText.text = "Sorry, I didn't understand that. Please try again.";
-                if (face != null) face.SetExpression(FaceExpression.Confused);
-                StartListening();
-                break;
+            return;
         }
-    }
 
-    void ShowHostCandidates(HostCandidate[] candidates)
-    {
-        if (candidates == null || candidates.Length == 0)
+        Debug.Log(
+            $"[ConversationScreen] " +
+            $"Received state: {response.state}"
+        );
+
+        if (listeningIndicator != null)
+            listeningIndicator.SetActive(false);
+
+        if (heardText != null)
         {
-            hostCandidatesPanel.SetActive(false);
+            heardText.text =
+                string.IsNullOrEmpty(
+                    response.heard_text
+                )
+                ? ""
+                : $"You said: {response.heard_text}";
+        }
+
+        // =====================================================
+        // HOST CANDIDATES
+        // =====================================================
+
+        if (response.state == "HOST_SELECTION" ||
+            response.state == "HOST_SUGGESTIONS")
+        {
+            if (flowManager != null &&
+                flowManager.Session != null)
+            {
+                flowManager.Session.hostCandidates =
+                    response.host_candidates;
+
+                flowManager.GoTo(
+                    VisitorFlowState.HostCandidatesSelection
+                );
+            }
+
+            return;
+        }
+
+        // =====================================================
+        // NAME CONFIRMATION
+        // =====================================================
+
+        if (response.state == "NAME_CONFIRMATION")
+        {
+            Debug.Log(
+                "[ConversationScreen] " +
+                "Opening NameConfirmationScreen."
+            );
+
+            if (flowManager != null &&
+                flowManager.Session != null)
+            {
+                flowManager.Session.visitorName =
+                    response.heard_text;
+
+                flowManager.GoTo(
+                    VisitorFlowState.NameConfirmation
+                );
+            }
+
+            return;
+        }
+
+        // =====================================================
+        // STATES THAT REQUIRE VISITOR TO SPEAK
+        // =====================================================
+
+        if (response.state == "AWAITING_PURPOSE" ||
+            response.state == "AWAITING_NAME" ||
+            response.state == "AWAITING_HOST_NAME" ||
+            response.state == "AWAITING_INTENT" ||
+            response.state == "ANYTHING_ELSE" ||
+            response.state == "QUERY_ANSWERED" ||
+            response.state == "FALLBACK")
+        {
+            Debug.Log(
+                "[ConversationScreen] " +
+                "Backend expects visitor response. " +
+                "Starting listening."
+            );
+
             StartListening();
+
             return;
         }
 
-        hostCandidatesPanel.SetActive(true);
-        selectedCandidateId = -1;
-        selectedCandidateButtonObj = null;
-        SetConfirmCancelInteractable(false);
+        // =====================================================
+        // HANDOFF
+        // =====================================================
 
-        foreach (Transform child in hostCandidatesContainer)
-            Destroy(child.gameObject);
-
-        foreach (var candidate in candidates)
+        if (response.state == "READY_FOR_HANDOFF")
         {
-            GameObject btnObj = Instantiate(hostCandidateButtonPrefab, hostCandidatesContainer);
-            btnObj.GetComponentInChildren<TextMeshProUGUI>().text = candidate.name;
+            if (flowManager != null &&
+                flowManager.Session != null)
+            {
+                if (response.matched_host != null)
+                {
+                    flowManager.Session.hostName =
+                        response.matched_host.name;
+                }
 
-            int id = candidate.id;
-            btnObj.GetComponent<Button>().onClick.AddListener(() => OnCandidateSelected(id, btnObj));
-        }
-    }
+                flowManager.Session.qrBase64 =
+                    response.qr_base64;
 
-    void OnCandidateSelected(int employeeId, GameObject btnObj)
-    {
-        if (selectedCandidateButtonObj != null)
-        {
-            var prevImage = selectedCandidateButtonObj.GetComponent<Image>();
-            if (prevImage != null) prevImage.color = defaultCandidateColor;
-        }
+                flowManager.GoTo(
+                    VisitorFlowState.MeetSomeone_ShowSimilarNames
+                );
+            }
 
-        selectedCandidateId = employeeId;
-        selectedCandidateButtonObj = btnObj;
-
-        var image = btnObj.GetComponent<Image>();
-        if (image != null) image.color = selectedColor;
-
-        SetConfirmCancelInteractable(true);
-    }
-
-    void OnConfirmHost()
-    {
-        if (selectedCandidateId == -1)
-        {
-            Debug.LogWarning("Confirm pressed with no candidate selected.");
             return;
         }
 
-        hostCandidatesPanel.SetActive(false);
-        SetConfirmCancelInteractable(false);
-        SessionManager.Instance.SelectHost(selectedCandidateId);
-    }
+        // =====================================================
+        // PHOTO
+        // =====================================================
 
-    void OnCancelHost()
-    {
-        hostCandidatesPanel.SetActive(false);
-        selectedCandidateId = -1;
-        selectedCandidateButtonObj = null;
-        SetConfirmCancelInteractable(false);
-        heardText.text = "";
+        if (response.state == "AWAITING_PHOTO")
+        {
+            Debug.Log(
+                "[ConversationScreen] " +
+                "Backend requested photo."
+            );
+
+            if (flowManager != null &&
+                flowManager.Session != null)
+            {
+                if (response.matched_host != null)
+                {
+                    flowManager.Session.hostName =
+                        response.matched_host.name;
+                }
+
+                flowManager.GoTo(
+                    VisitorFlowState.CapturePhoto
+                );
+            }
+
+            return;
+        }
+
+        // =====================================================
+        // UNKNOWN
+        // =====================================================
+
+        Debug.LogWarning(
+            "[ConversationScreen] " +
+            $"Unhandled state: {response.state}"
+        );
+
+        if (heardText != null)
+        {
+            heardText.text =
+                "Sorry, I didn't understand that. Please try again.";
+        }
+
+        if (face != null)
+        {
+            face.SetExpression(
+                FaceExpression.Confused
+            );
+        }
+
         StartListening();
     }
 
-    void ShowNameConfirmation(string heardName)
-    {
-        nameConfirmationPanel.SetActive(true);
-        nameInputField.text = heardName ?? "";
-    }
+    // =========================================================
+    // RECORDING FAILED
+    // =========================================================
 
-    public void OnSubmitName()
+    private void HandleRecordingFailed()
     {
-        string finalName = nameInputField.text.Trim();
-
-        if (string.IsNullOrEmpty(finalName))
-        {
-            Debug.LogWarning("Name field empty — not submitting.");
+        if (!isActiveAndEnabled)
             return;
+
+        Debug.LogWarning(
+            "[ConversationScreen] " +
+            "Recording failed."
+        );
+
+        if (heardText != null)
+        {
+            heardText.text =
+                "Didn't catch that. Please try again.";
         }
 
-        nameConfirmationPanel.SetActive(false);
-        SessionManager.Instance.SubmitName(finalName);
-    }
+        if (face != null)
+        {
+            face.SetExpression(
+                FaceExpression.Confused
+            );
+        }
 
-    void HandleRecordingFailed()
-    {
-        if (!isActiveAndEnabled) return;
-
-        heardText.text = "Didn't catch that. Please try again.";
-        if (face != null) face.SetExpression(FaceExpression.Confused);
         StartListening();
     }
 
-    void HandleRobotSpeakingForIndicator(string text)
+    // =========================================================
+    // ROBOT SPEAKING
+    // =========================================================
+
+    private void HandleRobotSpeakingForIndicator(
+        string text)
     {
-        listeningIndicator.SetActive(false);
+        if (!isActiveAndEnabled)
+            return;
+
+        if (listeningIndicator != null)
+            listeningIndicator.SetActive(false);
+
+        Debug.Log(
+            $"[ConversationScreen] Robot speaking: {text}"
+        );
     }
 }

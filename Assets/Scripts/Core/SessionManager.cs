@@ -8,8 +8,9 @@ public class SessionManager : MonoBehaviour
 {
     public event Action OnRecordingFailed;
     public event Action OnReadyToSpeak;
-    public event Action<string> OnRobotSpeaking; // fires with the text the robot is about to say
-    public event Action OnRobotFinishedSpeaking; // fires when that audio actually finishes
+    public event Action<string> OnRobotSpeaking;
+    public event Action OnRobotFinishedSpeaking;
+
     public static SessionManager Instance;
 
     public FaceDetectionService detectionService;
@@ -24,30 +25,37 @@ public class SessionManager : MonoBehaviour
 
     public event Action<SessionResponse> OnSessionUpdate;
 
-    private Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
+    private Dictionary<string, AudioClip> audioCache =
+        new Dictionary<string, AudioClip>();
 
-    // --- Cancellation support ---
+    // Cancellation support
     private Coroutine activeRecordRoutine;
     private Coroutine activeSendRoutine;
+    private Coroutine activeResponseAudioRoutine;
+    private System.Action activeTalkingFinishedHandler;
 
-    void Awake() { Instance = this; }
+    void Awake()
+    {
+        Instance = this;
+    }
 
     public void BeginSession(string sessionId)
     {
         CurrentSessionId = sessionId;
     }
 
-    // Call this whenever it's the visitor's turn to speak
+    // =========================================================
+    // RECORDING
+    // =========================================================
+
     public void RecordAndSend()
     {
-        // Make sure any previous recording/send cycle is fully stopped first
         CancelPendingRecording();
-        activeRecordRoutine = StartCoroutine(RecordAndSendRoutine());
+
+        activeRecordRoutine =
+            StartCoroutine(RecordAndSendRoutine());
     }
 
-    // Call this whenever the flow moves away from a state that expects audio
-    // (e.g. leaving ConversationScreen), so a late mic result can't get sent
-    // to a session that's no longer expecting it.
     public void CancelPendingRecording()
     {
         if (activeRecordRoutine != null)
@@ -63,10 +71,14 @@ public class SessionManager : MonoBehaviour
         }
 
         if (AudioRecorder.Instance != null)
-            AudioRecorder.Instance.StopRecording(); // no-op if nothing is recording; add this method if it doesn't exist yet
+        {
+            AudioRecorder.Instance.StopRecording();
+        }
 
         if (listeningIndicatorActive)
+        {
             OnRecordingCancelledCleanup();
+        }
     }
 
     private bool listeningIndicatorActive = false;
@@ -74,21 +86,36 @@ public class SessionManager : MonoBehaviour
     private void OnRecordingCancelledCleanup()
     {
         listeningIndicatorActive = false;
-        // Intentionally does NOT invoke OnRecordingFailed or any face expression —
-        // cancellation is a normal flow transition, not a failure.
     }
 
     private IEnumerator RecordAndSendRoutine()
     {
         yield return new WaitForSeconds(preListenBuffer);
 
-        if (cueAudioSource != null && readyToSpeakChime != null)
-            cueAudioSource.PlayOneShot(readyToSpeakChime);
+        if (cueAudioSource != null &&
+            readyToSpeakChime != null)
+        {
+            cueAudioSource.PlayOneShot(
+                readyToSpeakChime
+            );
+        }
 
         listeningIndicatorActive = true;
+
         OnReadyToSpeak?.Invoke();
 
-        AudioRecorder.Instance.StartRecording(OnAudioRecorded);
+        if (AudioRecorder.Instance != null)
+        {
+            AudioRecorder.Instance.StartRecording(
+                OnAudioRecorded
+            );
+        }
+        else
+        {
+            Debug.LogError(
+                "[SessionManager] AudioRecorder.Instance is NULL."
+            );
+        }
     }
 
     private void OnAudioRecorded(byte[] wavBytes)
@@ -102,139 +129,378 @@ public class SessionManager : MonoBehaviour
             OnRecordingFailed?.Invoke();
             return;
         }
-        activeSendRoutine = StartCoroutine(SendToRespond(wavBytes));
+
+        activeSendRoutine =
+            StartCoroutine(
+                SendToRespond(wavBytes)
+            );
     }
+
+    // =========================================================
+    // NORMAL VOICE RESPONSE
+    // =========================================================
 
     private IEnumerator SendToRespond(byte[] wavBytes)
     {
         WWWForm form = new WWWForm();
-        form.AddField("session_id", CurrentSessionId);
-        form.AddBinaryData("audio", wavBytes, "response.wav", "audio/wav");
 
-        using (UnityWebRequest www = UnityWebRequest.Post($"{detectionService.baseUrl}/session/respond", form))
+        form.AddField(
+            "session_id",
+            CurrentSessionId
+        );
+
+        form.AddBinaryData(
+            "audio",
+            wavBytes,
+            "response.wav",
+            "audio/wav"
+        );
+
+        using (UnityWebRequest www =
+               UnityWebRequest.Post(
+                   $"{detectionService.baseUrl}/session/respond",
+                   form))
         {
             yield return www.SendWebRequest();
 
             activeSendRoutine = null;
 
-            if (www.result == UnityWebRequest.Result.Success)
+            if (www.result ==
+                UnityWebRequest.Result.Success)
             {
-                SessionResponse response = JsonUtility.FromJson<SessionResponse>(www.downloadHandler.text);
-                Debug.Log($"Session state: {response.state}, heard: {response.heard_text}");
+                SessionResponse response =
+                    JsonUtility.FromJson<SessionResponse>(
+                        www.downloadHandler.text
+                    );
+
+                Debug.Log(
+                    $"[SESSION RESPONSE] " +
+                    $"state={response.state} | " +
+                    $"heard='{response.heard_text}' | " +
+                    $"answer='{response.answer_text}'"
+                );
+
+                // IMPORTANT:
+                // The robot speaks FIRST.
+                //
+                // We wait until the audio has completely finished
+                // before notifying ConversationScreen.
                 yield return PlayResponseAudio(response);
+
+                // Only now does ConversationScreen receive the state.
                 OnSessionUpdate?.Invoke(response);
             }
             else
             {
-                Debug.LogWarning("session/respond failed: " + www.error);
-                Debug.LogWarning("Response body: " + www.downloadHandler.text);
+                Debug.LogWarning(
+                    "session/respond failed: " +
+                    www.error
+                );
+
+                Debug.LogWarning(
+                    "Response body: " +
+                    www.downloadHandler.text
+                );
+
                 OnRecordingFailed?.Invoke();
             }
         }
     }
 
-    public IEnumerator PlayResponseAudio(SessionResponse response)
-    {
-        if (!string.IsNullOrEmpty(response.audio_base64))
-        {
-            byte[] bytes = Convert.FromBase64String(response.audio_base64);
-            yield return PlayBytes(bytes, response.answer_text);
-        }
-        else if (!string.IsNullOrEmpty(response.audio_key))
-        {
-            yield return PlayCachedOrFetch(response.audio_key, response.answer_text);
-        }
-    }
+    // =========================================================
+    // RESPONSE AUDIO
+    // =========================================================
 
-    private IEnumerator PlayBytes(byte[] mp3Bytes, string captionText)
+    public IEnumerator PlayResponseAudio(
+        SessionResponse response)
     {
-        string tempPath = Application.temporaryCachePath + "/session_temp.mp3";
-        System.IO.File.WriteAllBytes(tempPath, mp3Bytes);
-
-        using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip("file://" + tempPath, AudioType.MPEG))
+        if (response == null)
         {
-            yield return www.SendWebRequest();
-            if (www.result == UnityWebRequest.Result.Success)
-            {
-                AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
-                yield return PlayAndWaitForFinish(clip, captionText);
-            }
-        }
-    }
-
-    private IEnumerator PlayCachedOrFetch(string key, string captionText)
-    {
-        if (audioCache.TryGetValue(key, out AudioClip cached))
-        {
-            yield return PlayAndWaitForFinish(cached, captionText);
             yield break;
         }
 
-        string url = $"{detectionService.baseUrl}/audio/{key}";
-        using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG))
+        if (!string.IsNullOrEmpty(
+                response.audio_base64))
+        {
+            byte[] bytes =
+                Convert.FromBase64String(
+                    response.audio_base64
+                );
+
+            yield return PlayBytes(
+                bytes,
+                response.answer_text
+            );
+        }
+        else if (!string.IsNullOrEmpty(
+                     response.audio_key))
+        {
+            yield return PlayCachedOrFetch(
+                response.audio_key,
+                response.answer_text
+            );
+        }
+        else
+        {
+            Debug.Log(
+                "[SessionManager] Response has no audio."
+            );
+        }
+    }
+
+    // =========================================================
+    // AUDIO PLAYBACK
+    // =========================================================
+
+    private IEnumerator PlayBytes(
+        byte[] mp3Bytes,
+        string captionText)
+    {
+        string tempPath =
+            Application.temporaryCachePath +
+            "/session_temp.mp3";
+
+        System.IO.File.WriteAllBytes(
+            tempPath,
+            mp3Bytes
+        );
+
+        using (UnityWebRequest www =
+               UnityWebRequestMultimedia.GetAudioClip(
+                   "file://" + tempPath,
+                   AudioType.MPEG))
         {
             yield return www.SendWebRequest();
-            if (www.result == UnityWebRequest.Result.Success)
+
+            if (www.result ==
+                UnityWebRequest.Result.Success)
             {
-                AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
-                audioCache[key] = clip;
-                yield return PlayAndWaitForFinish(clip, captionText);
+                AudioClip clip =
+                    DownloadHandlerAudioClip.GetContent(
+                        www
+                    );
+
+                yield return PlayAndWaitForFinish(
+                    clip,
+                    captionText
+                );
+            }
+            else
+            {
+                Debug.LogWarning(
+                    "[SessionManager] Failed to load response audio: " +
+                    www.error
+                );
             }
         }
     }
 
-    private IEnumerator PlayAndWaitForFinish(AudioClip clip, string captionText = null)
+    private IEnumerator PlayCachedOrFetch(
+        string key,
+        string captionText)
     {
+        if (audioCache.TryGetValue(
+                key,
+                out AudioClip cached))
+        {
+            yield return PlayAndWaitForFinish(
+                cached,
+                captionText
+            );
+
+            yield break;
+        }
+
+        string url =
+            $"{detectionService.baseUrl}/audio/{key}";
+
+        using (UnityWebRequest www =
+               UnityWebRequestMultimedia.GetAudioClip(
+                   url,
+                   AudioType.MPEG))
+        {
+            yield return www.SendWebRequest();
+
+            if (www.result ==
+                UnityWebRequest.Result.Success)
+            {
+                AudioClip clip =
+                    DownloadHandlerAudioClip.GetContent(
+                        www
+                    );
+
+                audioCache[key] = clip;
+
+                yield return PlayAndWaitForFinish(
+                    clip,
+                    captionText
+                );
+            }
+            else
+            {
+                Debug.LogWarning(
+                    "[SessionManager] Failed to fetch audio: " +
+                    www.error
+                );
+            }
+        }
+    }
+
+    private IEnumerator PlayAndWaitForFinish(
+        AudioClip clip,
+        string captionText = null)
+    {
+        if (clip == null)
+        {
+            Debug.LogWarning(
+                "[SessionManager] AudioClip is NULL."
+            );
+
+            yield break;
+        }
+
         if (!string.IsNullOrEmpty(captionText))
-            OnRobotSpeaking?.Invoke(captionText);
+        {
+            OnRobotSpeaking?.Invoke(
+                captionText
+            );
+        }
 
         bool finished = false;
-        Action handler = () => finished = true;
-        face.OnTalkingFinished += handler;
 
-        face.StartTalking(clip);
-        yield return new WaitUntil(() => finished);
+        activeTalkingFinishedHandler =
+            () => finished = true;
 
-        face.OnTalkingFinished -= handler;
+        if (face != null)
+        {
+            face.OnTalkingFinished +=
+                activeTalkingFinishedHandler;
+
+            face.StartTalking(clip);
+        }
+        else
+        {
+            Debug.LogError(
+                "[SessionManager] FaceExpressionController is NULL."
+            );
+
+            yield break;
+        }
+
+        yield return new WaitUntil(
+            () => finished
+        );
+
+        if (face != null)
+        {
+            face.OnTalkingFinished -=
+                activeTalkingFinishedHandler;
+        }
+
+        activeTalkingFinishedHandler = null;
+
         OnRobotFinishedSpeaking?.Invoke();
     }
 
-    // ---------- Backend action calls ----------
+    // =========================================================
+    // BACKEND ACTION CALLS
+    // =========================================================
 
     public void SelectHost(int employeeId)
     {
-        StartCoroutine(PostJson("/session/confirm-host", $"{{\"session_id\":\"{CurrentSessionId}\",\"employee_id\":{employeeId}}}"));
+        StartCoroutine(
+            PostJson(
+                "/session/confirm-host",
+                $"{{\"session_id\":\"{CurrentSessionId}\",\"employee_id\":{employeeId}}}"
+            )
+        );
     }
 
     public void SubmitName(string name)
     {
-        string safeName = name.Replace("\"", "\\\"");
-        StartCoroutine(PostJson("/session/submit-name", $"{{\"session_id\":\"{CurrentSessionId}\",\"name\":\"{safeName}\"}}"));
+        string safeName =
+            name.Replace("\"", "\\\"");
+
+        StartCoroutine(
+            PostJson(
+                "/session/submit-name",
+                $"{{\"session_id\":\"{CurrentSessionId}\",\"name\":\"{safeName}\"}}"
+            )
+        );
     }
 
-    private IEnumerator PostJson(string endpoint, string json)
+    // =========================================================
+    // BUTTON / JSON RESPONSES
+    // =========================================================
+
+    private IEnumerator PostJson(
+        string endpoint,
+        string json)
     {
-        using (UnityWebRequest www = new UnityWebRequest($"{detectionService.baseUrl}{endpoint}", "POST"))
+        using (UnityWebRequest www =
+               new UnityWebRequest(
+                   $"{detectionService.baseUrl}{endpoint}",
+                   "POST"))
         {
-            byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(json);
-            www.uploadHandler = new UploadHandlerRaw(bodyRaw);
-            www.downloadHandler = new DownloadHandlerBuffer();
-            www.SetRequestHeader("Content-Type", "application/json");
+            byte[] bodyRaw =
+                System.Text.Encoding.UTF8.GetBytes(
+                    json
+                );
+
+            www.uploadHandler =
+                new UploadHandlerRaw(bodyRaw);
+
+            www.downloadHandler =
+                new DownloadHandlerBuffer();
+
+            www.SetRequestHeader(
+                "Content-Type",
+                "application/json"
+            );
 
             yield return www.SendWebRequest();
 
-            if (www.result == UnityWebRequest.Result.Success)
+            if (www.result ==
+                UnityWebRequest.Result.Success)
             {
-                SessionResponse response = JsonUtility.FromJson<SessionResponse>(www.downloadHandler.text);
+                SessionResponse response =
+                    JsonUtility.FromJson<SessionResponse>(
+                        www.downloadHandler.text
+                    );
+
+                Debug.Log(
+                    $"[POST RESPONSE] " +
+                    $"endpoint={endpoint} | " +
+                    $"state={response.state} | " +
+                    $"heard='{response.heard_text}' | " +
+                    $"answer='{response.answer_text}'"
+                );
+
+                // IMPORTANT:
+                // Same sequencing as SendToRespond:
+                //
+                // 1. Play robot response.
+                // 2. Wait until robot finishes.
+                // 3. Then notify ConversationScreen.
                 yield return PlayResponseAudio(response);
+
                 OnSessionUpdate?.Invoke(response);
             }
             else
             {
-                Debug.LogWarning($"{endpoint} failed: " + www.error);
-                Debug.LogWarning("Response body: " + www.downloadHandler.text);
+                Debug.LogWarning(
+                    $"{endpoint} failed: " +
+                    www.error
+                );
+
+                Debug.LogWarning(
+                    "Response body: " +
+                    www.downloadHandler.text
+                );
+
                 OnRecordingFailed?.Invoke();
             }
         }
     }
 }
+
