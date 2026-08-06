@@ -1,9 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models_db import VisitSession
+from app.models_db import VisitSession, VisitLog
 from app.services.stt_service import transcribe_best_of_two
-from app.services.connection_manager import manager
 import tempfile
 import os
 
@@ -21,9 +20,7 @@ async def record_message(
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    if not text and not audio:
-        raise HTTPException(status_code=400, detail="Provide either text or audio")
-
+    message_text = None
     if audio:
         audio_bytes = await audio.read()
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
@@ -34,18 +31,13 @@ async def record_message(
         finally:
             os.remove(tmp_path)
         message_text = stt_result["text"]
-    else:
+    elif text:
         message_text = text.strip()
 
-    session.message_text = message_text
-    session.visitor_choice = "message"
-    db.commit()
+    visit_log = db.query(VisitLog).filter(VisitLog.id == session.visit_log_id).first()
+    if visit_log:
+        visit_log.status = "message_left" if message_text else "concluded_no_message"
+        visit_log.message_text = message_text
+        db.commit()
 
-    if session.status_token:
-        await manager.send_update(session.status_token, {
-            "state": session.state,
-            "visitor_choice": session.visitor_choice,
-            "visitor_message": "Your message has been recorded and sent.",
-        })
-
-    return {"detail": "Message recorded", "message_text": session.message_text}
+    return {"detail": "Message recorded", "message_text": message_text}

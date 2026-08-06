@@ -1,11 +1,28 @@
-# app/routes/host/respond.py
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from app.database import get_db
-from app.models_db import Employee, VisitSession
+from app.models_db import Employee, VisitSession, VisitLog
+from app.models import HostRespondRequest
+from app.dependencies import get_current_employee
+from app.services.connection_manager import manager
+from app.services.visitor_status_service import build_visitor_status
+
+router = APIRouter()
+
+VALID_RESPONSES = ("available", "not_available", "wait")
+LOCAL_TZ = ZoneInfo("Asia/Karachi")
+
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+from app.database import get_db
+from app.models_db import Employee, VisitSession, VisitLog
 from app.models import HostRespondRequest
 from app.dependencies import get_current_employee
 from app.services.connection_manager import manager
@@ -43,20 +60,27 @@ async def host_respond(
     elif payload.response == "not_available":
         session.wait_until = None
         if payload.available_again_at:
-            # host enters this in local time — tag it as Karachi local, then store as UTC
             local_dt = payload.available_again_at.replace(tzinfo=LOCAL_TZ)
             session.available_again_at = local_dt.astimezone(timezone.utc)
         else:
             session.available_again_at = None
+
     session.host_response = payload.response
     db.commit()
+
+    # --- visit logging ---
+    if payload.response in ("available", "not_available"):
+        visit_log = db.query(VisitLog).filter(VisitLog.id == session.visit_log_id).first()
+        if visit_log:
+            visit_log.status = "completed" if payload.response == "available" else "host_unavailable"
+            db.commit()
 
     status = build_visitor_status(
         response=payload.response,
         employee=current_employee,
         wait_minutes=payload.wait_minutes,
         wait_until=session.wait_until,
-        available_again_at=session.available_again_at,  # use the converted value, not payload.available_again_at
+        available_again_at=session.available_again_at,
     )
 
     if session.status_token:
