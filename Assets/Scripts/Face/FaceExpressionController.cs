@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using System.Collections;
 
 public enum FaceExpression
@@ -14,12 +15,42 @@ public enum FaceExpression
     Purpose,
     Confused
 }
+
 public class FaceExpressionController : MonoBehaviour
 {
     [Header("Face Parts")]
     public RectTransform eyeLeft;
     public RectTransform eyeRight;
     public RectTransform mouth;
+
+    [Header("Face Parts - Sprites")]
+    public Image eyeLeftImage;
+    public Image eyeRightImage;
+    public Image eyebrowLeftImage;
+    public Image eyebrowRightImage;
+    public Image mouthImage;
+    public Image mouthTalkImage;
+    public Image blushLeftImage;
+    public Image blushRightImage;
+
+    [Header("Eye Sprites")]
+    public Sprite eyeOpenSprite;
+
+    [Header("Eyebrow Sprites")]
+    public Sprite browNeutralSprite;
+    public Sprite browRaisedSprite;
+    public Sprite browAngledSprite;
+
+    [Header("Mouth Sprites (static expressions)")]
+    public Sprite mouthClosedSprite;
+    public Sprite mouthSmileSprite;
+
+    [Header("Mouth Sprites (lip-sync visemes)")]
+    public Sprite mouthA;
+    public Sprite mouthI;
+    public Sprite mouthU;
+    public Sprite mouthE;
+    public Sprite mouthO;
 
     [Header("Blink Settings")]
     public float minBlinkInterval = 2f;
@@ -39,20 +70,15 @@ public class FaceExpressionController : MonoBehaviour
     private Vector3 eyeLeftBasePos, eyeRightBasePos, mouthBasePos;
     private Vector3 eyeLeftBaseRot, eyeRightBaseRot;
     private Vector3 faceRootBasePos, faceRootBaseScale;
+
     [Header("Talking")]
     public AudioSource audioSource;
     public AudioClip testClip;
     public RectTransform mouthTalk;
-    public float mouthOpenMultiplier = 1.5f;
-    public float talkSampleSmoothing = 8f;
-    public float minMouthOpenScale = 0.3f;
-    public float maxMouthOpenScale = 1.2f;
 
-    public event System.Action OnTalkingFinished; // ADD — fires exactly when audio actually stops
+    public event System.Action OnTalkingFinished;
 
-    private Coroutine talkingRoutine;
     private Coroutine breathingRoutine;
-    private float[] audioSampleData = new float[64];
 
     void Start()
     {
@@ -70,9 +96,14 @@ public class FaceExpressionController : MonoBehaviour
         faceRootBasePos = ((RectTransform)transform).anchoredPosition3D;
         faceRootBaseScale = transform.localScale;
 
-       blinkLoopRoutine = StartCoroutine(BlinkLoop());
-       breathingRoutine = StartCoroutine(BreathingLoop());
+        // Set initial sprite state
+        eyeLeftImage.sprite = eyeOpenSprite;
+        eyeRightImage.sprite = eyeOpenSprite;
+        SetEyebrowSprite(browNeutralSprite);
+        mouthImage.sprite = mouthClosedSprite;
 
+        blinkLoopRoutine = StartCoroutine(BlinkLoop());
+        breathingRoutine = StartCoroutine(BreathingLoop());
     }
 
     // ---------- PUBLIC API ----------
@@ -92,6 +123,14 @@ public class FaceExpressionController : MonoBehaviour
         currentExpression = FaceExpression.Idle;
     }
 
+    // ---------- EYEBROW HELPER ----------
+
+    void SetEyebrowSprite(Sprite s)
+    {
+        eyebrowLeftImage.sprite = s;
+        eyebrowRightImage.sprite = s;
+    }
+
     // ---------- BLINK ----------
 
     IEnumerator BlinkLoop()
@@ -108,30 +147,43 @@ public class FaceExpressionController : MonoBehaviour
     {
         Vector3 openL = eyeLeft.localScale;
         Vector3 openR = eyeRight.localScale;
+
         Vector3 closedL = new Vector3(openL.x, 0.1f, openL.z);
-        Vector3 closedR = new Vector3(openR.x, 0.1f, openR.z);
+        Vector3 closedR = new Vector3(openR.x, 0.1f, openR.z); // openR.x already carries the -1 flip
 
         float t = 0f;
-        while (t < 1f) { t += Time.deltaTime * blinkSpeed; eyeLeft.localScale = Vector3.Lerp(openL, closedL, t); eyeRight.localScale = Vector3.Lerp(openR, closedR, t); yield return null; }
+        while (t < 1f)
+        {
+            t += Time.deltaTime * blinkSpeed;
+            eyeLeft.localScale = Vector3.Lerp(openL, closedL, t);
+            eyeRight.localScale = Vector3.Lerp(openR, closedR, t);
+            yield return null;
+        }
         t = 0f;
-        while (t < 1f) { t += Time.deltaTime * blinkSpeed; eyeLeft.localScale = Vector3.Lerp(closedL, openL, t); eyeRight.localScale = Vector3.Lerp(closedR, openR, t); yield return null; }
+        while (t < 1f)
+        {
+            t += Time.deltaTime * blinkSpeed;
+            eyeLeft.localScale = Vector3.Lerp(closedL, openL, t);
+            eyeRight.localScale = Vector3.Lerp(closedR, openR, t);
+            yield return null;
+        }
     }
-    
+
     IEnumerator BreathingLoop()
     {
         float t = 0f;
         while (true)
         {
-            // Only breathe while at rest — not mid-expression or mid-bounce
             if (currentExpression == FaceExpression.Idle && !blinkingPaused)
             {
-                t += Time.deltaTime * 0.8f; // slow cycle
-                float scale = 1f + Mathf.Sin(t) * 0.02f; // 1.0 -> 1.02 -> 1.0
+                t += Time.deltaTime * 0.8f;
+                float scale = 1f + Mathf.Sin(t) * 0.02f;
                 transform.localScale = faceRootBaseScale * scale;
             }
             yield return null;
         }
     }
+
     // ---------- BOUNCE ----------
 
     IEnumerator Bounce(float height = 15f, float duration = 0.5f)
@@ -186,7 +238,7 @@ public class FaceExpressionController : MonoBehaviour
             yield return null;
         }
     }
-    
+
     // ---------- HEAD TILT ----------
 
     IEnumerator HeadTilt(float angle = 12f, float duration = 0.3f)
@@ -221,6 +273,8 @@ public class FaceExpressionController : MonoBehaviour
         switch (expression)
         {
             case FaceExpression.Happy:
+                SetEyebrowSprite(browRaisedSprite);
+                mouthImage.sprite = mouthSmileSprite;
                 yield return LerpToPose(
                     eyeScale: new Vector3(1f, 0.6f, 1f),
                     mouthScale: new Vector3(1.2f, 1f, 1f));
@@ -241,6 +295,7 @@ public class FaceExpressionController : MonoBehaviour
                 yield break;
 
             case FaceExpression.Apologetic:
+                SetEyebrowSprite(browAngledSprite);
                 float originalSpeed = transitionSpeed;
                 transitionSpeed = 3f;
                 yield return LerpToPose(
@@ -249,36 +304,41 @@ public class FaceExpressionController : MonoBehaviour
                     eyePosOffsetR: new Vector3(0, -6f, 0),
                     mouthScale: new Vector3(1f, -0.8f, 1f),
                     mouthPosOffset: new Vector3(0, -4f, 0));
+                transitionSpeed = originalSpeed;
                 break;
 
             case FaceExpression.Success:
+                SetEyebrowSprite(browRaisedSprite);
                 StartCoroutine(Bounce());
                 yield return LerpToPose(
                     eyeScale: new Vector3(1.2f, 1.2f, 1f),
                     mouthScale: new Vector3(1.3f, 1f, 1f));
                 yield return new WaitForSeconds(0.3f);
                 break;
-            
+
             case FaceExpression.Greeting:
+                SetEyebrowSprite(browRaisedSprite);
                 yield return EyeLook();
                 StartCoroutine(Bounce());
                 yield return LerpToPose(
                     eyeScale: new Vector3(1.2f, 1.2f, 1f),
                     mouthScale: new Vector3(1.2f, 1f, 1f));
                 break;
-            
+
             case FaceExpression.Purpose:
                 yield return HeadTilt();
                 break;
-            
+
             case FaceExpression.Confused:
+                SetEyebrowSprite(browAngledSprite);
                 yield return LerpToPose(
                     eyeScale: new Vector3(0.85f, 0.85f, 1f));
                 yield return HeadTilt(angle: -8f, duration: 0.25f);
                 yield return new WaitForSeconds(0.5f);
                 break;
-            
+
             case FaceExpression.Handoff:
+                SetEyebrowSprite(browRaisedSprite);
                 StartCoroutine(Bounce(height: 20f, duration: 0.4f));
                 yield return LerpToPose(
                     eyeScale: new Vector3(1.2f, 1.2f, 1f),
@@ -300,6 +360,9 @@ public class FaceExpressionController : MonoBehaviour
 
     IEnumerator TransitionToBaseline()
     {
+        SetEyebrowSprite(browNeutralSprite);
+        mouthImage.sprite = mouthClosedSprite;
+
         yield return LerpToPose(
             eyeScale: eyeLeftBaseScale,
             mouthScale: mouthBaseScale,
@@ -316,7 +379,24 @@ public class FaceExpressionController : MonoBehaviour
         Vector3? eyePosOffsetL = null, Vector3? eyePosOffsetR = null,
         Vector3? mouthPosOffset = null)
     {
-        Vector3 targetEyeScale = eyeScale ?? eyeLeftBaseScale;
+        // Left eye target
+        Vector3 targetEyeScaleL = eyeScale ?? eyeLeftBaseScale;
+
+        // Right eye target — same magnitude, but preserves the right eye's own
+        // baseline sign so a -1 X flip survives expression transitions
+        Vector3 targetEyeScaleR;
+        if (eyeScale.HasValue)
+        {
+            targetEyeScaleR = new Vector3(
+                Mathf.Abs(eyeScale.Value.x) * Mathf.Sign(eyeRightBaseScale.x),
+                eyeScale.Value.y,
+                eyeScale.Value.z);
+        }
+        else
+        {
+            targetEyeScaleR = eyeRightBaseScale;
+        }
+
         Vector3 targetMouthScale = mouthScale ?? mouthBaseScale;
         Vector3 targetEyeRotL = eyeRotL ?? eyeLeftBaseRot;
         Vector3 targetEyeRotR = eyeRotR ?? eyeRightBaseRot;
@@ -335,8 +415,8 @@ public class FaceExpressionController : MonoBehaviour
         {
             t += Time.deltaTime * transitionSpeed;
 
-            eyeLeft.localScale = Vector3.Lerp(startEyeScaleL, targetEyeScale, t);
-            eyeRight.localScale = Vector3.Lerp(startEyeScaleR, targetEyeScale, t);
+            eyeLeft.localScale = Vector3.Lerp(startEyeScaleL, targetEyeScaleL, t);
+            eyeRight.localScale = Vector3.Lerp(startEyeScaleR, targetEyeScaleR, t);
             mouth.localScale = Vector3.Lerp(startMouthScale, targetMouthScale, t);
 
             eyeLeft.localEulerAngles = new Vector3(
@@ -360,49 +440,36 @@ public class FaceExpressionController : MonoBehaviour
     }
 
     // ---------- Talking ----------
+    // Sprite swapping during speech is now driven entirely by LipSyncMouthReceiver,
+    // which listens to uLipSync's "On Lip Sync Update" event. This class just
+    // handles showing/hiding the mouthTalk object and starting/stopping playback.
 
     public void StartTalking(AudioClip clip)
     {
-        if (talkingRoutine != null) StopCoroutine(talkingRoutine);
         mouth.gameObject.SetActive(false);
         mouthTalk.gameObject.SetActive(true);
 
         audioSource.clip = clip;
         audioSource.Play();
-        talkingRoutine = StartCoroutine(TalkLoop());
+        StartCoroutine(WaitForTalkingToFinish());
     }
 
     public void StopTalking()
     {
-        if (talkingRoutine != null) StopCoroutine(talkingRoutine);
         audioSource.Stop();
         mouthTalk.gameObject.SetActive(false);
         mouth.gameObject.SetActive(true);
+        mouthImage.sprite = mouthClosedSprite;
         StartCoroutine(LerpToPose(mouthScale: mouthBaseScale));
     }
 
-    IEnumerator TalkLoop()
+    IEnumerator WaitForTalkingToFinish()
     {
-        float currentScale = minMouthOpenScale;
-
         while (audioSource.isPlaying)
-        {
-            audioSource.GetSpectrumData(audioSampleData, 0, FFTWindow.BlackmanHarris);
-
-            float loudness = 0f;
-            for (int i = 0; i < 20; i++)
-                loudness += audioSampleData[i];
-
-            float targetScale = Mathf.Clamp(minMouthOpenScale + (loudness * mouthOpenMultiplier * 50f), minMouthOpenScale, maxMouthOpenScale);
-            currentScale = Mathf.Lerp(currentScale, targetScale, Time.deltaTime * talkSampleSmoothing);
-
-            mouthTalk.localScale = new Vector3(1f, currentScale, 1f);
-
             yield return null;
-        }
 
         mouthTalk.gameObject.SetActive(false);
         mouth.gameObject.SetActive(true);
-        OnTalkingFinished?.Invoke(); // ADD
+        OnTalkingFinished?.Invoke();
     }
 }
