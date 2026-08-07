@@ -269,7 +269,7 @@ public class FaceExpressionController : MonoBehaviour
             
             case FaceExpression.Purpose:
                 yield return HeadTilt();
-                yield break;
+                break;
             
             case FaceExpression.Confused:
                 yield return LerpToPose(

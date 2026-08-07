@@ -217,9 +217,7 @@ public class CapturePhotoScreen : MonoBehaviour
             )
             {
                 PhotoFrameResponse response =
-                    JsonUtility.FromJson<
-                        PhotoFrameResponse
-                    >(
+                    JsonUtility.FromJson<PhotoFrameResponse>(
                         request.downloadHandler.text
                     );
 
@@ -413,9 +411,7 @@ public class CapturePhotoScreen : MonoBehaviour
             )
             {
                 SessionResponse response =
-                    JsonUtility.FromJson<
-                        SessionResponse
-                    >(
+                    JsonUtility.FromJson<SessionResponse>(
                         request.downloadHandler.text
                     );
 
@@ -445,6 +441,21 @@ public class CapturePhotoScreen : MonoBehaviour
                     );
                 }
 
+                // Let the green boundary sit for a beat so the visitor
+                // sees the "success" moment before the preview disappears.
+                yield return new WaitForSeconds(0.5f);
+
+                // Hide the camera preview / boundary / prompts so the
+                // robot's face is what's visible while it talks.
+                HidePreviewVisuals();
+
+                // Re-enable captions now that the preview is hidden and
+                // the robot is about to speak the handoff line.
+                if (RobotCaptionController.Instance != null)
+                {
+                    RobotCaptionController.Instance.SetSuppressed(false);
+                }
+
                 // Robot finishes speaking before we leave this
                 // screen.
                 if (SessionManager.Instance != null)
@@ -460,6 +471,23 @@ public class CapturePhotoScreen : MonoBehaviour
                 {
                     captureInFlight = false;
                     yield break;
+                }
+
+                // =================================================
+                // CARRY FORWARD HOST + QR DATA
+                // =================================================
+
+                if (flowManager != null &&
+                    flowManager.Session != null)
+                {
+                    if (response.matched_host != null)
+                    {
+                        flowManager.Session.hostName =
+                            response.matched_host.name;
+                    }
+
+                    flowManager.Session.qrBase64 =
+                        response.qr_base64;
                 }
 
                 // =================================================
@@ -564,5 +592,32 @@ public class CapturePhotoScreen : MonoBehaviour
             retryText.SetActive(false);
         }
     }
-}
 
+
+    // =========================================================
+    // HIDE PREVIEW VISUALS
+    // =========================================================
+
+    private void HidePreviewVisuals()
+    {
+        if (cameraPreview != null)
+        {
+            cameraPreview.gameObject.SetActive(false);
+        }
+
+        if (boundaryOutline != null)
+        {
+            boundaryOutline.SetActive(false);
+        }
+
+        if (promptText != null)
+        {
+            promptText.SetActive(false);
+        }
+
+        if (retryText != null)
+        {
+            retryText.SetActive(false);
+        }
+    }
+}
