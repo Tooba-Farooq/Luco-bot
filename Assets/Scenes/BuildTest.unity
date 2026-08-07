@@ -15495,9 +15495,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AudioRecorder
   sampleRate: 16000
   silenceThreshold: 0.02
-  silenceDurationToStop: 1.8
+  silenceDurationToStop: 1.5
   maxRecordingLength: 15
   minRecordingLength: 0.5
+  logVolumeForCalibration: 0
 --- !u!4 &1514361374
 Transform:
   m_ObjectHideFlags: 0
