@@ -11,13 +11,20 @@ public class AudioRecorder : MonoBehaviour
     public int sampleRate = 16000; // Whisper prefers 16kHz
     public float silenceThreshold = 0.02f; // calibrated: silence ~0.001-0.006, well under this
     public float silenceDurationToStop = 1.8f;
-    public float maxRecordingLength = 15f;
+    public float maxRecordingLength = 30f;
     public float minRecordingLength = 0.5f; // avoid sending empty/near-empty clips
 
     [Header("Debug")]
     [Tooltip("Logs live volume readings to the console for threshold calibration.")]
     public bool logVolumeForCalibration = false;
+    
+    [Header("Waveform Data")]
+    public int volumeHistorySize = 12; // match your bar count
 
+    public float CurrentVolume { get; private set; }
+
+    private float[] volumeHistoryBuffer;
+    private int volumeHistoryIndex;
     private string micDevice;
     private AudioClip recordingClip;
     private bool isRecording = false;
@@ -73,6 +80,19 @@ public class AudioRecorder : MonoBehaviour
         activeOnComplete = null; // deliberately do NOT invoke — this is a cancellation, not a completion/failure
     }
 
+    public float[] GetVolumeHistory()
+{
+    if (volumeHistoryBuffer == null) return new float[volumeHistorySize];
+
+    float[] ordered = new float[volumeHistoryBuffer.Length];
+    for (int i = 0; i < volumeHistoryBuffer.Length; i++)
+    {
+        int idx = (volumeHistoryIndex + i) % volumeHistoryBuffer.Length;
+        ordered[i] = volumeHistoryBuffer[idx];
+    }
+    return ordered;
+}
+
     private IEnumerator RecordRoutine(Action<byte[]> onComplete)
     {
         isRecording = true;
@@ -83,6 +103,9 @@ public class AudioRecorder : MonoBehaviour
         // Microphone.GetPosition() returning 0 (=> "No audio recorded" even
         // though the mic was live the whole time). Looping means only our own
         // Microphone.End() call below stops it.
+        volumeHistoryBuffer = new float[volumeHistorySize];
+        volumeHistoryIndex = 0;
+        CurrentVolume = 0f;
         recordingClip = Microphone.Start(
             micDevice,
             true,
@@ -121,7 +144,10 @@ public class AudioRecorder : MonoBehaviour
                     float volume = 0f;
                     foreach (float s in sampleWindow) volume += Mathf.Abs(s);
                     volume /= sampleWindow.Length;
-
+                    
+                    CurrentVolume = volume;
+                    volumeHistoryBuffer[volumeHistoryIndex] = volume;
+                    volumeHistoryIndex = (volumeHistoryIndex + 1) % volumeHistoryBuffer.Length;
                     if (logVolumeForCalibration)
                     {
                         Debug.Log(

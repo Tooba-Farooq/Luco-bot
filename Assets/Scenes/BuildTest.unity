@@ -9775,7 +9775,7 @@ MonoBehaviour:
   - {fileID: 731172981}
   minBarHeight: 70
   maxBarHeight: 100
-  animationSpeed: 6
+  animationSpeed: 3
 --- !u!1 &936186152
 GameObject:
   m_ObjectHideFlags: 0
@@ -15988,6 +15988,7 @@ MonoBehaviour:
   maxRecordingLength: 15
   minRecordingLength: 0.5
   logVolumeForCalibration: 0
+  volumeHistorySize: 9
 --- !u!4 &1514361374
 Transform:
   m_ObjectHideFlags: 0

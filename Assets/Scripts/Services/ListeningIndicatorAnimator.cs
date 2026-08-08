@@ -36,22 +36,38 @@ public class ListeningIndicatorAnimator : MonoBehaviour
     }
 
     void AnimateWaveform()
+{
+    if (waveformBars == null || AudioRecorder.Instance == null) return;
+
+    float[] volumeHistory = AudioRecorder.Instance.GetVolumeHistory();
+    int sampleCount = Mathf.Min(volumeHistory.Length, waveformBars.Length);
+
+    for (int i = 0; i < waveformBars.Length; i++)
     {
-        if (waveformBars == null) return;
+        if (waveformBars[i] == null) continue;
 
-        for (int i = 0; i < waveformBars.Length; i++)
+        float normalized;
+
+        if (i < sampleCount)
         {
-            if (waveformBars[i] == null) continue;
-
-            float t = Time.time * animationSpeed * barSpeedMultipliers[i] + barPhaseOffsets[i];
-            float normalized = (Mathf.Sin(t) + Mathf.Sin(t * 1.7f + 1f)) * 0.25f + 0.5f;
-            float height = Mathf.Lerp(minBarHeight, maxBarHeight, normalized);
-
-            Vector2 size = waveformBars[i].sizeDelta;
-            size.y = height;
-            waveformBars[i].sizeDelta = size;
+            // scale relative to silence threshold so it reacts sensibly
+            // regardless of the raw volume range
+            normalized = Mathf.Clamp01(
+                volumeHistory[i] / (AudioRecorder.Instance.silenceThreshold * 6f)
+            );
         }
+        else
+        {
+            normalized = 0f;
+        }
+
+        float targetHeight = Mathf.Lerp(minBarHeight, maxBarHeight, normalized);
+
+        Vector2 size = waveformBars[i].sizeDelta;
+        size.y = Mathf.Lerp(size.y, targetHeight, Time.deltaTime * animationSpeed);
+        waveformBars[i].sizeDelta = size;
     }
+}
 
     void AnimateMicPulse()
     {
