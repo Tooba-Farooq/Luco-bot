@@ -21,6 +21,10 @@ public class SessionManager : MonoBehaviour
     public AudioSource cueAudioSource;
     public float preListenBuffer = 0.4f;
 
+    [Header("Speak Now Prompt")]
+    public AudioClip speakNowClip;
+    public string speakNowText = "Speak now";
+
     public string CurrentSessionId { get; private set; }
 
     public event Action<SessionResponse> OnSessionUpdate;
@@ -89,34 +93,31 @@ public class SessionManager : MonoBehaviour
     }
 
     private IEnumerator RecordAndSendRoutine()
+{
+    yield return new WaitForSeconds(preListenBuffer);
+
+    if (speakNowClip != null && face != null)
     {
-        yield return new WaitForSeconds(preListenBuffer);
-
-        if (cueAudioSource != null &&
-            readyToSpeakChime != null)
-        {
-            cueAudioSource.PlayOneShot(
-                readyToSpeakChime
-            );
-        }
-
-        listeningIndicatorActive = true;
-
-        OnReadyToSpeak?.Invoke();
-
-        if (AudioRecorder.Instance != null)
-        {
-            AudioRecorder.Instance.StartRecording(
-                OnAudioRecorded
-            );
-        }
-        else
-        {
-            Debug.LogError(
-                "[SessionManager] AudioRecorder.Instance is NULL."
-            );
-        }
+        yield return PlayAndWaitForFinish(speakNowClip, speakNowText);
     }
+
+    listeningIndicatorActive = true;
+
+    OnReadyToSpeak?.Invoke();
+
+    if (AudioRecorder.Instance != null)
+    {
+        AudioRecorder.Instance.StartRecording(
+            OnAudioRecorded
+        );
+    }
+    else
+    {
+        Debug.LogError(
+            "[SessionManager] AudioRecorder.Instance is NULL."
+        );
+    }
+}
 
     private void OnAudioRecorded(byte[] wavBytes)
     {

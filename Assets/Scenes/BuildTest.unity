@@ -21855,6 +21855,8 @@ MonoBehaviour:
   readyToSpeakChime: {fileID: 8300000, guid: 107c9545a5a27714ca69eeace1adfd87, type: 3}
   cueAudioSource: {fileID: 1407589829}
   preListenBuffer: 0.4
+  speakNowClip: {fileID: 8300000, guid: 691496cbe625a4845937eb3d6639a710, type: 3}
+  speakNowText: Speak now
 --- !u!4 &2079412238
 Transform:
   m_ObjectHideFlags: 0
