@@ -8,7 +8,7 @@ public class SessionManager : MonoBehaviour
 {
     public event Action OnRecordingFailed;
     public event Action OnReadyToSpeak;
-    public event Action<string> OnRobotSpeaking;
+    public event Action<string, float> OnRobotSpeaking;
     public event Action OnRobotFinishedSpeaking;
 
     public static SessionManager Instance;
@@ -361,9 +361,7 @@ public class SessionManager : MonoBehaviour
 
         if (!string.IsNullOrEmpty(captionText))
         {
-            OnRobotSpeaking?.Invoke(
-                captionText
-            );
+            OnRobotSpeaking?.Invoke(captionText, clip.length);
         }
 
         bool finished = false;

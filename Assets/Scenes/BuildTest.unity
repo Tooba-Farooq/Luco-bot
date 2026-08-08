@@ -9254,8 +9254,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 934545cce6bede94c96d8fecf9cf33db, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RobotCaptionController
-  robotCaptionBubble: {fileID: 52028657}
-  robotCaptionText: {fileID: 1143494152}
+  captionBar: {fileID: 118479731}
 --- !u!1001 &908717183
 PrefabInstance:
   m_ObjectHideFlags: 0

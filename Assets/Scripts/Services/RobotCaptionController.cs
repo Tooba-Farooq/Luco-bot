@@ -1,23 +1,23 @@
 using UnityEngine;
-using TMPro;
 
 public class RobotCaptionController : MonoBehaviour
 {
-    public static RobotCaptionController Instance; // ADD
+    public static RobotCaptionController Instance;
 
-    public GameObject robotCaptionBubble;
-    public TextMeshProUGUI robotCaptionText;
+    public CaptionBarController captionBar;
 
-    private bool suppressed = false; // ADD
-    private string pendingText = null; // ADD — remembers what was said while suppressed, in case caller wants it later
+    private bool suppressed = false;
+    private string pendingText = null; // remembers what was said while suppressed, in case caller wants it later
 
-    void Awake() { Instance = this; } // ADD
+    void Awake() { Instance = this; }
 
     void Start()
     {
         SessionManager.Instance.OnRobotSpeaking += HandleRobotSpeaking;
         SessionManager.Instance.OnRobotFinishedSpeaking += HandleRobotFinishedSpeaking;
-        robotCaptionBubble.SetActive(false);
+
+        if (captionBar != null)
+            captionBar.HideCaption();
     }
 
     void OnDisable()
@@ -29,22 +29,26 @@ public class RobotCaptionController : MonoBehaviour
         }
     }
 
-    public void SetSuppressed(bool value) // ADD
+    public void SetSuppressed(bool value)
     {
         suppressed = value;
-        if (suppressed)
-            robotCaptionBubble.SetActive(false);
+        if (suppressed && captionBar != null)
+            captionBar.HideCaption();
     }
 
-    void HandleRobotSpeaking(string text)
+    void HandleRobotSpeaking(string text, float duration)
     {
-        if (suppressed) return; // ADD — Capture Photo (or any screen) can silence captions without touching this script
-        robotCaptionText.text = text;
-        robotCaptionBubble.SetActive(true);
+        pendingText = text;
+
+        if (suppressed) return; // Capture Photo (or any screen) can silence captions without touching this script
+
+        if (captionBar != null)
+            captionBar.ShowCaption(text, duration);
     }
 
     void HandleRobotFinishedSpeaking()
     {
-        robotCaptionBubble.SetActive(false);
+        if (captionBar != null)
+            captionBar.HideCaption();
     }
 }

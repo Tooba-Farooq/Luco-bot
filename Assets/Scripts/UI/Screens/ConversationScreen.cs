@@ -340,8 +340,8 @@ public class ConversationScreen : MonoBehaviour
     // =========================================================
 
     private void HandleRobotSpeakingForIndicator(
-        string text)
-    {
+    string text, float duration)
+    {   
         if (!isActiveAndEnabled)
             return;
 
@@ -349,7 +349,7 @@ public class ConversationScreen : MonoBehaviour
             listeningIndicator.SetActive(false);
 
         Debug.Log(
-            $"[ConversationScreen] Robot speaking: {text}"
+        $"[ConversationScreen] Robot speaking: {text}"
         );
     }
 }
