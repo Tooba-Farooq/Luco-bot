@@ -7803,8 +7803,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -100}
-  m_SizeDelta: {x: 380, y: 384}
+  m_AnchoredPosition: {x: 0, y: -250}
+  m_SizeDelta: {x: 492, y: 295}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &762985816
 MonoBehaviour:
@@ -7826,7 +7826,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: -4098421070183516880, guid: 7c5ac4136cad6ca4cacc7a13426f1fdd, type: 3}
+  m_Sprite: {fileID: 338864254516108606, guid: 7171665ef6d87e64f85b070df7678e15, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -19219,11 +19219,11 @@ MonoBehaviour:
   browAngledSprite: {fileID: -43199710562319112, guid: 2550c108a717c0a42b1a57b38752a698, type: 3}
   mouthClosedSprite: {fileID: -7907616447179849608, guid: a0df8ad31c84e7244809bcc333023a8c, type: 3}
   mouthSmileSprite: {fileID: 6051597989568444428, guid: 889eb19718793b64fac40c5c37f98859, type: 3}
-  mouthA: {fileID: -6741172402978533028, guid: 8b0e554f9dd8afd45bbb6347af06d8fe, type: 3}
-  mouthI: {fileID: -1262166645960947242, guid: 0a27570c396688540bc44fb959a072b7, type: 3}
-  mouthU: {fileID: 2263670506716716438, guid: 90b4cb70f709f2b4ab4d14213f379cfb, type: 3}
-  mouthE: {fileID: -4088524952736516297, guid: be3cfb5b71015f44db10b05e4ed37526, type: 3}
-  mouthO: {fileID: 6051597989568444428, guid: 889eb19718793b64fac40c5c37f98859, type: 3}
+  mouthA: {fileID: -8221802452147339452, guid: 191b52ac57ae6a34dac165214afa8e24, type: 3}
+  mouthI: {fileID: -2998702330032532567, guid: 4728a97d10d355c4d8ec80acb1c2ea97, type: 3}
+  mouthU: {fileID: -7974801485340964435, guid: 776912380bfb5d344b650b5d1727e00f, type: 3}
+  mouthE: {fileID: 3228681307683998360, guid: a7c8372f4431fe14fb9b84914ea74479, type: 3}
+  mouthO: {fileID: 6693738823437917186, guid: c5d8dc535489ed149b20b8f4fa232c56, type: 3}
   minBlinkInterval: 2
   maxBlinkInterval: 5
   blinkSpeed: 12
@@ -19231,10 +19231,6 @@ MonoBehaviour:
   audioSource: {fileID: 1902588908}
   testClip: {fileID: 8300000, guid: 280068fd09d05e642a333ff5f2ae7a2e, type: 3}
   mouthTalk: {fileID: 762985815}
-  mouthOpenMultiplier: 1.5
-  talkSampleSmoothing: 8
-  minMouthOpenScale: 0.3
-  maxMouthOpenScale: 1.2
 --- !u!82 &1902588908
 AudioSource:
   m_ObjectHideFlags: 0
@@ -19387,11 +19383,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LipSyncMouthReceiver
   mouthTalkImage: {fileID: 762985816}
-  mouthA: {fileID: -6741172402978533028, guid: 8b0e554f9dd8afd45bbb6347af06d8fe, type: 3}
-  mouthI: {fileID: -1262166645960947242, guid: 0a27570c396688540bc44fb959a072b7, type: 3}
-  mouthU: {fileID: 2263670506716716438, guid: 90b4cb70f709f2b4ab4d14213f379cfb, type: 3}
-  mouthE: {fileID: -4088524952736516297, guid: be3cfb5b71015f44db10b05e4ed37526, type: 3}
-  mouthO: {fileID: -4422720151374106707, guid: 3d0e7b3757d9fa241a1db4aeb4a551a3, type: 3}
+  mouthA: {fileID: -8221802452147339452, guid: 191b52ac57ae6a34dac165214afa8e24, type: 3}
+  mouthI: {fileID: -2998702330032532567, guid: 4728a97d10d355c4d8ec80acb1c2ea97, type: 3}
+  mouthU: {fileID: -7974801485340964435, guid: 776912380bfb5d344b650b5d1727e00f, type: 3}
+  mouthE: {fileID: 3228681307683998360, guid: a7c8372f4431fe14fb9b84914ea74479, type: 3}
+  mouthO: {fileID: 6693738823437917186, guid: c5d8dc535489ed149b20b8f4fa232c56, type: 3}
   mouthClosed: {fileID: -1406093740160914041, guid: c10d02bb519cb7e418aed391f05fa0b6, type: 3}
 --- !u!1 &1912922094
 GameObject:
