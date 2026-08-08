@@ -5,7 +5,7 @@ public class ConversationScreen : MonoBehaviour
 {
     [Header("UI Text & Indicators")]
     public TextMeshProUGUI heardText;
-    public GameObject listeningIndicator;
+    public CaptionBarController captionBar;
 
     [Header("Flow")]
     public VisitorFlowManager flowManager;
@@ -77,8 +77,8 @@ public class ConversationScreen : MonoBehaviour
 
         isStartingRecording = false;
 
-        if (listeningIndicator != null)
-            listeningIndicator.SetActive(false);
+        if (captionBar != null)
+            captionBar.HideListening();
     }
 
     // =========================================================
@@ -117,8 +117,8 @@ public class ConversationScreen : MonoBehaviour
         if (!isActiveAndEnabled)
             return;
 
-        if (listeningIndicator != null)
-            listeningIndicator.SetActive(true);
+        if (captionBar != null)
+            captionBar.ShowListening();
 
         Debug.Log(
             "[ConversationScreen] " +
@@ -144,8 +144,8 @@ public class ConversationScreen : MonoBehaviour
             $"Received state: {response.state}"
         );
 
-        if (listeningIndicator != null)
-            listeningIndicator.SetActive(false);
+        if (captionBar != null)
+            captionBar.HideListening();
 
         if (heardText != null)
         {
@@ -345,8 +345,8 @@ public class ConversationScreen : MonoBehaviour
         if (!isActiveAndEnabled)
             return;
 
-        if (listeningIndicator != null)
-            listeningIndicator.SetActive(false);
+        if (captionBar != null)
+            captionBar.HideListening();
 
         Debug.Log(
         $"[ConversationScreen] Robot speaking: {text}"

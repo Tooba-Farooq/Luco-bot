@@ -7,10 +7,11 @@ public class CaptionBarController : MonoBehaviour
     [Header("References")]
     public GameObject captionBar;
     public TMP_Text captionText;
+    public GameObject listeningIndicator;
 
     [Header("Typing Animation")]
     public bool useTypingAnimation = true;
-    public float minCharsPerSecond = 30f; // fallback speed if no duration given
+    public float minCharsPerSecond = 30f;
 
     private Coroutine typingRoutine;
 
@@ -18,10 +19,13 @@ public class CaptionBarController : MonoBehaviour
     {
         if (captionBar == null || captionText == null) return;
 
+        HideListening();
+
         if (typingRoutine != null)
             StopCoroutine(typingRoutine);
 
         captionBar.SetActive(true);
+        captionText.gameObject.SetActive(true);
 
         if (string.IsNullOrEmpty(text))
         {
@@ -47,7 +51,29 @@ public class CaptionBarController : MonoBehaviour
             typingRoutine = null;
         }
 
-        if (captionBar != null)
+        if (captionBar != null && listeningIndicator != null && !listeningIndicator.activeSelf)
+            captionBar.SetActive(false);
+
+        if (captionText != null)
+            captionText.gameObject.SetActive(false);
+    }
+
+    public void ShowListening()
+    {
+        if (captionBar == null || listeningIndicator == null) return;
+
+        HideCaption();
+
+        captionBar.SetActive(true);
+        listeningIndicator.SetActive(true);
+    }
+
+    public void HideListening()
+    {
+        if (listeningIndicator != null)
+            listeningIndicator.SetActive(false);
+
+        if (captionBar != null && captionText != null && !captionText.gameObject.activeSelf)
             captionBar.SetActive(false);
     }
 

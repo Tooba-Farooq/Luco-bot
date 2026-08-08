@@ -7,13 +7,11 @@ public class ListeningIndicatorAnimator : MonoBehaviour
     public RectTransform micIcon;
     public float micPulseScale = 1.15f;
     public float micPulseSpeed = 2f;
-
     [Header("Waveform Bars")]
     public RectTransform[] waveformBars;
-    public float minBarHeight = 8f;
-    public float maxBarHeight = 40f;
-    public float animationSpeed = 6f;
-
+    public float minBarHeight = 4f;
+    public float maxBarHeight = 20f;
+    public float animationSpeed = 1.5f;
     private float[] barPhaseOffsets;
     private float[] barSpeedMultipliers;
 
@@ -32,7 +30,6 @@ public class ListeningIndicatorAnimator : MonoBehaviour
     void Update()
     {
         AnimateWaveform();
-        AnimateMicPulse();
     }
 
     void AnimateWaveform()
