@@ -89,44 +89,39 @@ public class UIManager : MonoBehaviour
     // =========================================================
 
     public void ShowScreen(VisitorFlowState state)
+{
+    Debug.Log($"[UIManager] Showing state: {state}");
+
+    if (!screenMap.TryGetValue(state, out GameObject nextScreen))
     {
-        Debug.Log(
-            $"[UIManager] Showing state: {state}"
-        );
-
-        // ALWAYS turn everything off first.
+        Debug.LogWarning($"[UIManager] No screen mapped for state: {state}");
         HideAllScreens();
-
-        if (!screenMap.TryGetValue(
-                state,
-                out GameObject nextScreen))
-        {
-            Debug.LogWarning(
-                $"[UIManager] No screen mapped for state: {state}"
-            );
-
-            currentScreen = null;
-            return;
-        }
-
-        if (nextScreen == null)
-        {
-            Debug.LogError(
-                $"[UIManager] Screen reference is NULL for state: {state}"
-            );
-
-            currentScreen = null;
-            return;
-        }
-
-        nextScreen.SetActive(true);
-
-        currentScreen = nextScreen;
-
-        Debug.Log(
-            $"[UIManager] ACTIVE SCREEN = {nextScreen.name}"
-        );
+        currentScreen = null;
+        return;
     }
+
+    if (nextScreen == null)
+    {
+        Debug.LogError($"[UIManager] Screen reference is NULL for state: {state}");
+        HideAllScreens();
+        currentScreen = null;
+        return;
+    }
+
+    // Same screen as before — don't toggle it off/on.
+    if (nextScreen == currentScreen)
+    {
+        Debug.Log($"[UIManager] Staying on same screen: {nextScreen.name}");
+        return;
+    }
+
+    HideAllScreens();
+
+    nextScreen.SetActive(true);
+    currentScreen = nextScreen;
+
+    Debug.Log($"[UIManager] ACTIVE SCREEN = {nextScreen.name}");
+}
 
     // =========================================================
     // HIDE EVERYTHING

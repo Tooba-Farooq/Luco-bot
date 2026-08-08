@@ -15,6 +15,10 @@ public Button cancelHostButton;
 [Tooltip("Optional. Assign the visual content of this screen, NOT the GameObject containing this script.")]
 public GameObject visualRoot;
 
+[Header("Face Cover")]
+[Tooltip("Image that blocks the robot's face while this screen is active. Toggled alongside visualRoot.")]
+public GameObject faceCoverImage;
+
 [Header("Flow")]
 public VisitorFlowManager flowManager;
 public FaceExpressionController face;
@@ -125,6 +129,9 @@ private void HideVisuals()
             cancelHostButton.gameObject.SetActive(false);
     }
 
+    if (faceCoverImage != null)
+        faceCoverImage.SetActive(false);
+
     Debug.Log(
         "[HostCandidatesScreen] Visuals hidden while waiting for response."
     );
@@ -147,6 +154,9 @@ private void ShowVisuals()
         if (cancelHostButton != null)
             cancelHostButton.gameObject.SetActive(true);
     }
+
+    if (faceCoverImage != null)
+        faceCoverImage.SetActive(true);
 }
 
 // =========================================================
@@ -504,4 +514,3 @@ private void HandleRecordingFailed()
     }
 }
 }
-
