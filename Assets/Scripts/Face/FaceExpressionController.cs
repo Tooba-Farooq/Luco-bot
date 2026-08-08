@@ -57,12 +57,18 @@ public class FaceExpressionController : MonoBehaviour
     public float maxBlinkInterval = 5f;
     public float blinkSpeed = 12f;
 
+    [Header("Eye Wander Settings")]
+    public float minWanderInterval = 3f;
+    public float maxWanderInterval = 6f;
+    public float wanderOffsetRange = 10f;
+
     [Header("Expression Transition Speed")]
     public float transitionSpeed = 6f;
 
     private FaceExpression currentExpression = FaceExpression.Idle;
     private Coroutine expressionRoutine;
     private Coroutine blinkLoopRoutine;
+    private Coroutine eyeWanderRoutine;
     private bool blinkingPaused = false;
 
     // Baseline (idle) values, captured at Start so every expression can return to them
@@ -100,10 +106,11 @@ public class FaceExpressionController : MonoBehaviour
         eyeLeftImage.sprite = eyeOpenSprite;
         eyeRightImage.sprite = eyeOpenSprite;
         SetEyebrowSprite(browNeutralSprite);
-        mouthImage.sprite = mouthClosedSprite;
+        mouthImage.sprite = mouthSmileSprite;
 
         blinkLoopRoutine = StartCoroutine(BlinkLoop());
         breathingRoutine = StartCoroutine(BreathingLoop());
+        eyeWanderRoutine = StartCoroutine(EyeWanderLoop());
     }
 
     // ---------- PUBLIC API ----------
@@ -181,6 +188,22 @@ public class FaceExpressionController : MonoBehaviour
                 transform.localScale = faceRootBaseScale * scale;
             }
             yield return null;
+        }
+    }
+
+    // ---------- EYE WANDER ----------
+
+    IEnumerator EyeWanderLoop()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(Random.Range(minWanderInterval, maxWanderInterval));
+
+            if (currentExpression == FaceExpression.Idle && !blinkingPaused)
+            {
+                float offset = Random.Range(-wanderOffsetRange, wanderOffsetRange);
+                yield return EyeLook(xOffset: offset, duration: 0.4f);
+            }
         }
     }
 
@@ -361,7 +384,7 @@ public class FaceExpressionController : MonoBehaviour
     IEnumerator TransitionToBaseline()
     {
         SetEyebrowSprite(browNeutralSprite);
-        mouthImage.sprite = mouthClosedSprite;
+        mouthImage.sprite = mouthSmileSprite;
 
         yield return LerpToPose(
             eyeScale: eyeLeftBaseScale,

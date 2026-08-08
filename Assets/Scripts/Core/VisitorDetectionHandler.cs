@@ -14,8 +14,7 @@ public class VisitorDetectionHandler : MonoBehaviour
     private Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
 
     [Header("UI")]
-    public GameObject greetingCaptionBubble;
-    public TMPro.TMP_Text greetingCaptionText;
+    public CaptionBarController captionBar;
 
     void OnEnable()
     {
@@ -101,7 +100,7 @@ public class VisitorDetectionHandler : MonoBehaviour
             if (www.result == UnityWebRequest.Result.Success)
             {
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
-                ShowCaption(captionText);
+                ShowCaption(captionText, clip.length);
                 yield return PlayAndAdvance(clip);
             }
             else
@@ -124,7 +123,7 @@ public class VisitorDetectionHandler : MonoBehaviour
 
         if (audioCache.TryGetValue(key, out AudioClip cached))
         {
-            ShowCaption(captionText);
+            ShowCaption(captionText, cached.length);
             yield return PlayAndAdvance(cached);
             yield break;
         }
@@ -138,7 +137,7 @@ public class VisitorDetectionHandler : MonoBehaviour
             {
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
                 audioCache[key] = clip;
-                ShowCaption(captionText);
+                ShowCaption(captionText, clip.length);
                 yield return PlayAndAdvance(clip);
             }
             else
@@ -151,17 +150,16 @@ public class VisitorDetectionHandler : MonoBehaviour
 
     // ---------- Caption show/hide ----------
 
-    private void ShowCaption(string text)
+    private void ShowCaption(string text, float syncDuration = -1f)
     {
-        if (greetingCaptionBubble == null || greetingCaptionText == null) return;
-        greetingCaptionText.text = text;
-        greetingCaptionBubble.SetActive(true);
+        if (captionBar != null)
+            captionBar.ShowCaption(text, syncDuration);
     }
 
     private void HideCaption()
     {
-        if (greetingCaptionBubble == null) return;
-        greetingCaptionBubble.SetActive(false);
+        if (captionBar != null)
+            captionBar.HideCaption();
     }
 
     // ---------- Shared: play clip, wait for REAL finish, then advance ----------

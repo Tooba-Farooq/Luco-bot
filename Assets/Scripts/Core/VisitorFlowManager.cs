@@ -60,7 +60,9 @@ public class VisitorFlowManager : MonoBehaviour
             case VisitorFlowState.Idle:
 
                 Session.Reset();
-
+                if (detectionHandler != null && detectionHandler.captionBar != null)
+                    detectionHandler.captionBar.HideCaption();
+                    
                 if (face != null)
                     face.ReturnToIdle();
 
@@ -230,36 +232,4 @@ public class VisitorFlowManager : MonoBehaviour
             detectionService.StartPolling();
         }
     }
-
-#if UNITY_EDITOR
-
-    void Update()
-    {
-        if (Keyboard.current != null &&
-            Keyboard.current.hKey.wasPressedThisFrame)
-        {
-            Session.hostCandidates =
-                new HostCandidate[]
-                {
-                    new HostCandidate
-                    {
-                        id = 1,
-                        name = "Ahmed Khan"
-                    },
-
-                    new HostCandidate
-                    {
-                        id = 2,
-                        name = "Sara Ali"
-                    }
-                };
-
-            GoTo(
-                VisitorFlowState.HostCandidatesSelection
-            );
-        }
-    }
-
-#endif
 }
-
