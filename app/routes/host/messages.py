@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models_db import Employee, VisitSession, Visitor
+from app.models_db import Employee, VisitSession, VisitLog, Visitor
 from app.dependencies import get_current_employee
 import os
 
@@ -15,34 +15,41 @@ def get_messages(
     current_employee: Employee = Depends(get_current_employee),
     db: Session = Depends(get_db),
 ):
-    sessions = (
-        db.query(VisitSession)
+    logs = (
+        db.query(VisitLog)
         .filter(
-            VisitSession.selected_host_id == current_employee.id,
-            VisitSession.message_text.isnot(None),
+            VisitLog.host_employee_id == current_employee.id,
+            VisitLog.message_text.isnot(None),
         )
-        .order_by(VisitSession.host_alert_sent_at.desc())
+        .order_by(VisitLog.created_at.desc())
         .all()
     )
 
     results = []
-    for session in sessions:
-        visitor_name = session.recognized_name or "A visitor"
-        visitor_id = session.visitor_id
+    for log in logs:
+        # each VisitLog is pointed to by exactly one VisitSession (set at
+        # persist_at_handoff) — look it up to get session_id for the app's
+        # visit-specific actions/traceability
+        session = (
+            db.query(VisitSession)
+            .filter(VisitSession.visit_log_id == log.id)
+            .first()
+        )
+
+        visitor = db.query(Visitor).filter(Visitor.id == log.visitor_id).first()
+        visitor_name = (visitor.name if visitor else None) or "A visitor"
         visitor_photo_url = ""
-        if visitor_id:
-            visitor = db.query(Visitor).filter(Visitor.id == visitor_id).first()
-            if visitor and visitor.photo_path:
-                visitor_photo_url = f"{PUBLIC_BASE_URL}/{visitor.photo_path}"
+        if visitor and visitor.photo_path:
+            visitor_photo_url = f"{PUBLIC_BASE_URL}/{visitor.photo_path}"
 
         results.append({
-            "session_id": session.session_id,
-            "visitor_id": visitor_id,
+            "session_id": session.session_id if session else None,
+            "visitor_id": log.visitor_id,
             "visitor_name": visitor_name,
             "visitor_photo_url": visitor_photo_url,
-            "message_text": session.message_text,
-            "purpose": session.purpose or "",
-            "left_at": session.host_alert_sent_at.isoformat() if session.host_alert_sent_at else None,
+            "message_text": log.message_text,
+            "purpose": log.purpose or "",
+            "left_at": log.created_at.isoformat() if log.created_at else None,
         })
 
     return {"messages": results}
