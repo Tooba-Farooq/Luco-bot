@@ -9,17 +9,21 @@ public class AudioRecorder : MonoBehaviour
 
     [Header("Recording Settings")]
     public int sampleRate = 16000; // Whisper prefers 16kHz
-    public float silenceThreshold = 0.02f; // calibrated: silence ~0.001-0.006, well under this
+    public float silenceThreshold = 0.02f; // Fallback minimum
     public float silenceDurationToStop = 1.8f;
     public float maxRecordingLength = 30f;
-    public float minRecordingLength = 0.5f; // avoid sending empty/near-empty clips
+    public float minRecordingLength = 0.5f;
+
+    [Header("Noise Calibration")]
+    public float calibrationDuration = 0.3f;
+    public float noiseFloorMultiplier = 3f;
 
     [Header("Debug")]
     [Tooltip("Logs live volume readings to the console for threshold calibration.")]
     public bool logVolumeForCalibration = false;
-    
+
     [Header("Waveform Data")]
-    public int volumeHistorySize = 12; // match your bar count
+    public int volumeHistorySize = 12;
 
     public float CurrentVolume { get; private set; }
 
@@ -31,26 +35,41 @@ public class AudioRecorder : MonoBehaviour
     private Coroutine activeRecordCoroutine;
     private Action<byte[]> activeOnComplete;
 
-    void Awake()
+    private void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
         Instance = this;
+
         if (Microphone.devices.Length > 0)
             micDevice = Microphone.devices[0];
+    }
+
+    private void OnDisable()
+    {
+        StopRecording();
+    }
+
+    private void OnDestroy()
+    {
+        StopRecording();
     }
 
     public void StartRecording(Action<byte[]> onComplete)
     {
         if (string.IsNullOrEmpty(micDevice))
         {
-            Debug.LogWarning("No microphone device available.");
+            Debug.LogWarning("[AudioRecorder] No microphone device available.");
             onComplete?.Invoke(null);
             return;
         }
 
-        // Guard against overlapping recordings
         if (isRecording)
         {
-            Debug.LogWarning("StartRecording called while already recording — stopping previous recording first.");
+            Debug.LogWarning("[AudioRecorder] StartRecording called while active. Stopping previous session.");
             StopRecording();
         }
 
@@ -58,14 +77,10 @@ public class AudioRecorder : MonoBehaviour
         activeRecordCoroutine = StartCoroutine(RecordRoutine(onComplete));
     }
 
-    // Cancels an in-progress recording without invoking onComplete.
-    // Use this when the flow moves on and the result would no longer be wanted
-    // (e.g. ConversationScreen disabling because the session moved past
-    // a state that expects audio).
     public void StopRecording()
     {
         if (!isRecording && activeRecordCoroutine == null)
-            return; // nothing to stop — safe no-op
+            return;
 
         if (activeRecordCoroutine != null)
         {
@@ -73,58 +88,84 @@ public class AudioRecorder : MonoBehaviour
             activeRecordCoroutine = null;
         }
 
-        if (Microphone.IsRecording(micDevice))
+        if (!string.IsNullOrEmpty(micDevice) && Microphone.IsRecording(micDevice))
+        {
             Microphone.End(micDevice);
+        }
 
         isRecording = false;
-        activeOnComplete = null; // deliberately do NOT invoke — this is a cancellation, not a completion/failure
+        activeOnComplete = null;
     }
 
     public float[] GetVolumeHistory()
-{
-    if (volumeHistoryBuffer == null) return new float[volumeHistorySize];
-
-    float[] ordered = new float[volumeHistoryBuffer.Length];
-    for (int i = 0; i < volumeHistoryBuffer.Length; i++)
     {
-        int idx = (volumeHistoryIndex + i) % volumeHistoryBuffer.Length;
-        ordered[i] = volumeHistoryBuffer[idx];
+        if (volumeHistoryBuffer == null) return new float[volumeHistorySize];
+
+        float[] ordered = new float[volumeHistoryBuffer.Length];
+        for (int i = 0; i < volumeHistoryBuffer.Length; i++)
+        {
+            int idx = (volumeHistoryIndex + i) % volumeHistoryBuffer.Length;
+            ordered[i] = volumeHistoryBuffer[idx];
+        }
+        return ordered;
     }
-    return ordered;
-}
 
     private IEnumerator RecordRoutine(Action<byte[]> onComplete)
     {
         isRecording = true;
 
-        // IMPORTANT: loop = true.
-        // With loop = false, Unity auto-stops the clip once maxRecordingLength
-        // is reached, which can race against our own timer-based stop and leave
-        // Microphone.GetPosition() returning 0 (=> "No audio recorded" even
-        // though the mic was live the whole time). Looping means only our own
-        // Microphone.End() call below stops it.
         volumeHistoryBuffer = new float[volumeHistorySize];
         volumeHistoryIndex = 0;
         CurrentVolume = 0f;
-        recordingClip = Microphone.Start(
-            micDevice,
-            true,
-            Mathf.CeilToInt(maxRecordingLength) + 1,
-            sampleRate
-        );
 
-        // wait for mic to actually start
-        while (Microphone.GetPosition(micDevice) <= 0) yield return null;
+        int maxSamples = Mathf.CeilToInt(maxRecordingLength) * sampleRate;
+        
+        // Add a safety margin to clip length so loop wrapping never triggers before maxRecordingLength
+        recordingClip = Microphone.Start(micDevice, true, Mathf.CeilToInt(maxRecordingLength) + 5, sampleRate);
 
+        while (Microphone.GetPosition(micDevice) <= 0) 
+            yield return null;
+
+        const float pollInterval = 0.1f;
+        int windowSize = Mathf.RoundToInt(sampleRate * pollInterval);
+        float[] sampleWindow = new float[windowSize];
+        const int safetyMargin = 256;
+
+        // --- Noise Calibration ---
+        float calibElapsed = 0f;
+        float noiseFloorSum = 0f;
+        int noiseFloorSamples = 0;
+
+        while (calibElapsed < calibrationDuration)
+        {
+            int micPos = Microphone.GetPosition(micDevice) - windowSize - safetyMargin;
+            if (micPos >= 0 && micPos + windowSize <= recordingClip.samples)
+            {
+                recordingClip.GetData(sampleWindow, micPos);
+                float v = 0f;
+                foreach (float s in sampleWindow) v += Mathf.Abs(s);
+                v /= sampleWindow.Length;
+
+                noiseFloorSum += v;
+                noiseFloorSamples++;
+            }
+
+            calibElapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        float noiseFloor = noiseFloorSamples > 0 ? noiseFloorSum / noiseFloorSamples : 0f;
+        float effectiveThreshold = Mathf.Max(silenceThreshold, noiseFloor * noiseFloorMultiplier);
+
+        if (logVolumeForCalibration)
+        {
+            Debug.Log($"[AudioRecorder] Calibrated noiseFloor={noiseFloor:F4} effectiveThreshold={effectiveThreshold:F4}");
+        }
+
+        // --- Recording Loop ---
         float elapsed = 0f;
         float silenceTimer = 0f;
         bool speechDetected = false;
-
-        const float pollInterval = 0.1f; // 100ms averaging window, matches Python reference script
-        int windowSize = Mathf.RoundToInt(sampleRate * pollInterval);
-        float[] sampleWindow = new float[windowSize];
-
-        const int safetyMargin = 256;      // stay this many samples behind the write head
         float pollTimer = 0f;
 
         while (elapsed < maxRecordingLength)
@@ -136,29 +177,24 @@ public class AudioRecorder : MonoBehaviour
                 pollTimer = 0f;
 
                 int micPos = Microphone.GetPosition(micDevice) - sampleWindow.Length - safetyMargin;
-                int clipSamples = recordingClip.samples;
 
-                if (micPos >= 0 && micPos + sampleWindow.Length <= clipSamples)
+                if (micPos >= 0 && micPos + sampleWindow.Length <= recordingClip.samples)
                 {
                     recordingClip.GetData(sampleWindow, micPos);
                     float volume = 0f;
                     foreach (float s in sampleWindow) volume += Mathf.Abs(s);
                     volume /= sampleWindow.Length;
-                    
+
                     CurrentVolume = volume;
                     volumeHistoryBuffer[volumeHistoryIndex] = volume;
                     volumeHistoryIndex = (volumeHistoryIndex + 1) % volumeHistoryBuffer.Length;
+
                     if (logVolumeForCalibration)
                     {
-                        Debug.Log(
-                            $"[AudioRecorder] volume={volume:F4} " +
-                            $"threshold={silenceThreshold:F4} " +
-                            $"speechDetected={speechDetected} " +
-                            $"silenceTimer={silenceTimer:F2}"
-                        );
+                        Debug.Log($"[AudioRecorder] vol={volume:F4} thresh={effectiveThreshold:F4} speech={speechDetected} silence={silenceTimer:F2}");
                     }
 
-                    if (volume > silenceThreshold)
+                    if (volume > effectiveThreshold)
                     {
                         speechDetected = true;
                         silenceTimer = 0f;
@@ -181,29 +217,46 @@ public class AudioRecorder : MonoBehaviour
         isRecording = false;
         activeRecordCoroutine = null;
 
-        // No usable audio, or nobody actually spoke above threshold.
-        // Sending near-silent clips to the backend risks ASR hallucinations
-        // (e.g. Whisper returning "music" on silence), so we discard here
-        // instead of sending.
-        if (finalPos <= 0 || !speechDetected)
+        // Clamp final sample length to max allowable samples to prevent overflow read
+        int recordedSampleCount = Mathf.Min(finalPos, maxSamples);
+
+        if (recordedSampleCount <= 0 || !speechDetected)
         {
-            if (!speechDetected && finalPos > 0)
+            if (!speechDetected && recordedSampleCount > 0)
             {
-                Debug.Log(
-                    "[AudioRecorder] No speech detected above threshold — " +
-                    "discarding clip instead of sending to backend."
-                );
+                Debug.Log("[AudioRecorder] No speech detected above threshold — discarding clip.");
             }
 
             onComplete?.Invoke(null);
             yield break;
         }
 
-        float[] finalSamples = new float[finalPos];
+        float[] finalSamples = new float[recordedSampleCount];
         recordingClip.GetData(finalSamples, 0);
+
+        NormalizeGain(finalSamples);
 
         byte[] wavBytes = EncodeToWav(finalSamples, sampleRate, 1);
         onComplete?.Invoke(wavBytes);
+    }
+
+    private void NormalizeGain(float[] samples, float targetPeak = 0.95f)
+    {
+        float peak = 0f;
+        foreach (float s in samples)
+        {
+            float abs = Mathf.Abs(s);
+            if (abs > peak) peak = abs;
+        }
+
+        if (peak < 0.0001f) return;
+
+        float scale = targetPeak / peak;
+
+        for (int i = 0; i < samples.Length; i++)
+        {
+            samples[i] = Mathf.Clamp(samples[i] * scale, -1f, 1f);
+        }
     }
 
     private byte[] EncodeToWav(float[] samples, int sampleRate, int channels)

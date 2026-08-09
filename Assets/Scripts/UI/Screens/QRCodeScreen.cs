@@ -12,7 +12,7 @@ public class QRCodeScreen : MonoBehaviour
     public Texture2D staticQRFallback;
 
     [Header("Timing")]
-    public float displayDuration = 8f;
+    public float displayDuration = 25f;
 
     void OnEnable()
     {
