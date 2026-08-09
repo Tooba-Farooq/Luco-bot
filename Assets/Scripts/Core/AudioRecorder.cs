@@ -9,14 +9,21 @@ public class AudioRecorder : MonoBehaviour
 
     [Header("Recording Settings")]
     public int sampleRate = 16000; // Whisper prefers 16kHz
-    public float silenceThreshold = 0.02f; // Fallback minimum
-    public float silenceDurationToStop = 1.8f;
+    [Tooltip("Lower default threshold (0.005) allows quiet speech in quiet rooms to register easily.")]
+    public float silenceThreshold = 0.005f; 
+    public float silenceDurationToStop = 1.5f;
     public float maxRecordingLength = 30f;
     public float minRecordingLength = 0.5f;
 
     [Header("Noise Calibration")]
     public float calibrationDuration = 0.3f;
-    public float noiseFloorMultiplier = 3f;
+    public float noiseFloorMultiplier = 2.0f;
+    [Tooltip("Prevents early speech during calibration from blowing up the noise floor.")]
+    public float maxAllowedNoiseFloor = 0.008f; 
+
+    [Header("Device Selection")]
+    [Tooltip("Leave blank to use system default microphone (Microphone.devices[0]).")]
+    public string preferredMicDevice = "";
 
     [Header("Debug")]
     [Tooltip("Logs live volume readings to the console for threshold calibration.")]
@@ -44,8 +51,7 @@ public class AudioRecorder : MonoBehaviour
         }
         Instance = this;
 
-        if (Microphone.devices.Length > 0)
-            micDevice = Microphone.devices[0];
+        SelectMicrophoneDevice();
     }
 
     private void OnDisable()
@@ -58,13 +64,43 @@ public class AudioRecorder : MonoBehaviour
         StopRecording();
     }
 
+    public void SelectMicrophoneDevice()
+    {
+        if (Microphone.devices.Length == 0)
+        {
+            Debug.LogError("[AudioRecorder] No microphone input devices found on system!");
+            micDevice = null;
+            return;
+        }
+
+        // Search for preferred mic if user set one in inspector, otherwise default to device 0 (OS default)
+        micDevice = Microphone.devices[0];
+        if (!string.IsNullOrEmpty(preferredMicDevice))
+        {
+            foreach (string device in Microphone.devices)
+            {
+                if (device.Equals(preferredMicDevice, StringComparison.OrdinalIgnoreCase))
+                {
+                    micDevice = device;
+                    break;
+                }
+            }
+        }
+
+        Debug.Log($"[AudioRecorder] Active Microphone Device: '{micDevice}'");
+    }
+
     public void StartRecording(Action<byte[]> onComplete)
     {
         if (string.IsNullOrEmpty(micDevice))
         {
-            Debug.LogWarning("[AudioRecorder] No microphone device available.");
-            onComplete?.Invoke(null);
-            return;
+            SelectMicrophoneDevice();
+            if (string.IsNullOrEmpty(micDevice))
+            {
+                Debug.LogWarning("[AudioRecorder] Cannot start recording: No microphone device available.");
+                onComplete?.Invoke(null);
+                return;
+            }
         }
 
         if (isRecording)
@@ -119,8 +155,6 @@ public class AudioRecorder : MonoBehaviour
         CurrentVolume = 0f;
 
         int maxSamples = Mathf.CeilToInt(maxRecordingLength) * sampleRate;
-        
-        // Add a safety margin to clip length so loop wrapping never triggers before maxRecordingLength
         recordingClip = Microphone.Start(micDevice, true, Mathf.CeilToInt(maxRecordingLength) + 5, sampleRate);
 
         while (Microphone.GetPosition(micDevice) <= 0) 
@@ -154,12 +188,17 @@ public class AudioRecorder : MonoBehaviour
             yield return null;
         }
 
-        float noiseFloor = noiseFloorSamples > 0 ? noiseFloorSum / noiseFloorSamples : 0f;
-        float effectiveThreshold = Mathf.Max(silenceThreshold, noiseFloor * noiseFloorMultiplier);
+        float measuredNoise = noiseFloorSamples > 0 ? noiseFloorSum / noiseFloorSamples : 0f;
+        
+        // CAP NOISE FLOOR: Prevents speech during calibration from blowing up threshold calculations
+        float cappedNoiseFloor = Mathf.Min(measuredNoise, maxAllowedNoiseFloor);
+        
+        // Calculate effective threshold with a lower lower-bound safety check
+        float effectiveThreshold = Mathf.Max(silenceThreshold, cappedNoiseFloor * noiseFloorMultiplier);
 
         if (logVolumeForCalibration)
         {
-            Debug.Log($"[AudioRecorder] Calibrated noiseFloor={noiseFloor:F4} effectiveThreshold={effectiveThreshold:F4}");
+            Debug.Log($"[AudioRecorder] Raw Noise={measuredNoise:F4} Capped Noise={cappedNoiseFloor:F4} Threshold={effectiveThreshold:F4}");
         }
 
         // --- Recording Loop ---
@@ -217,7 +256,6 @@ public class AudioRecorder : MonoBehaviour
         isRecording = false;
         activeRecordCoroutine = null;
 
-        // Clamp final sample length to max allowable samples to prevent overflow read
         int recordedSampleCount = Mathf.Min(finalPos, maxSamples);
 
         if (recordedSampleCount <= 0 || !speechDetected)
