@@ -11,12 +11,15 @@ router = APIRouter()
 
 @router.post("/message")
 async def record_message(
-    session_id: str = Form(...),
+    status_token: str = Form(...),
     text: str | None = Form(None),
     audio: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
-    session = db.query(VisitSession).filter(VisitSession.session_id == session_id).first()
+    # Resolve the session server-side via status_token — the public,
+    # visitor-facing identifier — rather than trusting/exposing session_id
+    # directly to the client.
+    session = db.query(VisitSession).filter(VisitSession.status_token == status_token).first()
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 

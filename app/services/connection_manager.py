@@ -29,12 +29,12 @@ class ConnectionManager:
             return False
 
     async def expire(self, status_token: str):
-    websocket = self._connections.pop(status_token, None)
-    if websocket is not None:
-        try:
-            await websocket.close()
-        except Exception:
-            pass
+        websocket = self._connections.pop(status_token, None)
+        if websocket is not None:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
 
 
 manager = ConnectionManager()

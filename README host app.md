@@ -287,6 +287,29 @@ wss://<backend-host>/ws/status/{status_token}
 
 ---
 
+### Leaving a message for the host
+
+If the host is unavailable, the visitor can leave a message (typed or voice) from the status page.
+
+​`
+POST /message
+Content-Type: multipart/form-data
+
+status_token=<token from URL>
+text=<typed message> # optional
+audio=<audio file> # optional
+​`
+
+Send **either** `text` or `audio`, not both. Uses `status_token` (not `session_id`) — same public-safe identifier as the WebSocket connection, so the frontend never needs to know or send the internal `session_id`.
+
+Success response:
+
+​`json
+{ "detail": "Message recorded", "message_text": "<transcribed or typed text>" }
+​`
+
+Errors: `404` if `status_token` doesn't match any session.
+
 ## Errors to handle
 
 | Status                           | Meaning                                                                                 |
@@ -299,5 +322,6 @@ wss://<backend-host>/ws/status/{status_token}
 | 404 on `/host/respond`           | `session_id` doesn't exist                                                              |
 | 403 on `/host/respond`           | Session is assigned to a different host                                                 |
 | 400 on `/host/respond`           | Invalid `response` value, or missing/invalid `wait_minutes` when `response` is `"wait"` |
+| 404 on `/message`                | `status_token` doesn't match any session                                                |
 
 ---
