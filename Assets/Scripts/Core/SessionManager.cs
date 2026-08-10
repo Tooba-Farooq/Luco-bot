@@ -22,8 +22,8 @@ public class SessionManager : MonoBehaviour
     public float preListenBuffer = 0.4f;
 
     [Header("Speak Now Prompt")]
-    public AudioClip speakNowClip;
     public string speakNowText = "Speak now";
+    public float speakNowDisplayDuration = 1.2f; // how long the text stays up before listening starts
 
     public string CurrentSessionId { get; private set; }
 
@@ -96,9 +96,10 @@ public class SessionManager : MonoBehaviour
 {
     yield return new WaitForSeconds(preListenBuffer);
 
-    if (speakNowClip != null && face != null)
+    if (!string.IsNullOrEmpty(speakNowText))
     {
-        yield return PlayAndWaitForFinish(speakNowClip, speakNowText);
+        OnRobotSpeaking?.Invoke(speakNowText, speakNowDisplayDuration);
+        yield return new WaitForSeconds(speakNowDisplayDuration);
     }
 
     listeningIndicatorActive = true;
@@ -107,15 +108,11 @@ public class SessionManager : MonoBehaviour
 
     if (AudioRecorder.Instance != null)
     {
-        AudioRecorder.Instance.StartRecording(
-            OnAudioRecorded
-        );
+        AudioRecorder.Instance.StartRecording(OnAudioRecorded);
     }
     else
     {
-        Debug.LogError(
-            "[SessionManager] AudioRecorder.Instance is NULL."
-        );
+        Debug.LogError("[SessionManager] AudioRecorder.Instance is NULL.");
     }
 }
 

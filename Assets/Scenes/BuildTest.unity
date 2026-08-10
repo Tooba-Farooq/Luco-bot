@@ -9828,7 +9828,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -350.00003, y: 0}
+  m_AnchoredPosition: {x: -350, y: 0}
   m_SizeDelta: {x: -700, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &927063250
@@ -13286,6 +13286,7 @@ MonoBehaviour:
   face: {fileID: 1902588907}
   flowManager: {fileID: 2089889922}
   captionBar: {fileID: 118479731}
+  idlePromptText: Come closer to chat
 --- !u!114 &1214131311
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16110,6 +16111,10 @@ MonoBehaviour:
   silenceDurationToStop: 1.5
   maxRecordingLength: 15
   minRecordingLength: 0.5
+  calibrationDuration: 0.3
+  noiseFloorMultiplier: 2
+  maxAllowedNoiseFloor: 0.008
+  preferredMicDevice: 
   logVolumeForCalibration: 0
   volumeHistorySize: 9
 --- !u!4 &1514361374
@@ -21932,8 +21937,8 @@ MonoBehaviour:
   readyToSpeakChime: {fileID: 8300000, guid: 107c9545a5a27714ca69eeace1adfd87, type: 3}
   cueAudioSource: {fileID: 1407589829}
   preListenBuffer: 0.4
-  speakNowClip: {fileID: 8300000, guid: 691496cbe625a4845937eb3d6639a710, type: 3}
   speakNowText: Speak now
+  speakNowDisplayDuration: 1
 --- !u!4 &2079412238
 Transform:
   m_ObjectHideFlags: 0

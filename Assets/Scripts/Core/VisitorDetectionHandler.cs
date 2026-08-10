@@ -15,7 +15,7 @@ public class VisitorDetectionHandler : MonoBehaviour
 
     [Header("UI")]
     public CaptionBarController captionBar;
-
+    public string idlePromptText = "Come closer to chat";
     void OnEnable()
     {
         detectionService.OnDetectionResult += HandleResult;
@@ -49,15 +49,18 @@ public class VisitorDetectionHandler : MonoBehaviour
             case "idle":
                 face.ReturnToIdle();
                 flowManager.GoTo(VisitorFlowState.Idle);
+                ShowCaption(idlePromptText);
                 break;
 
             case "detecting":
+                HideCaption();
                 flowManager.GoTo(VisitorFlowState.DetectingPerson);
                 break;
 
             case "unknown":
                 if (result.session_id == lastSessionId) return;
                 lastSessionId = result.session_id;
+                HideCaption();
                 SessionManager.Instance.BeginSession(result.session_id);
                 flowManager.Session.isKnownVisitor = false;
                 detectionService.StopPolling();
@@ -68,6 +71,7 @@ public class VisitorDetectionHandler : MonoBehaviour
             case "known":
                 if (result.session_id == lastSessionId) return;
                 lastSessionId = result.session_id;
+                HideCaption();
                 SessionManager.Instance.BeginSession(result.session_id);
                 flowManager.Session.isKnownVisitor = true;
                 flowManager.Session.visitorName = result.visitor_name;
