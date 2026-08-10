@@ -16,6 +16,7 @@ public class VisitorDetectionHandler : MonoBehaviour
     [Header("UI")]
     public CaptionBarController captionBar;
     public string idlePromptText = "Come closer to chat";
+    public string detectingPromptText = "Keep looking at me...";
     void OnEnable()
     {
         detectionService.OnDetectionResult += HandleResult;
@@ -53,7 +54,7 @@ public class VisitorDetectionHandler : MonoBehaviour
                 break;
 
             case "detecting":
-                HideCaption();
+                ShowCaption(detectingPromptText);
                 flowManager.GoTo(VisitorFlowState.DetectingPerson);
                 break;
 
