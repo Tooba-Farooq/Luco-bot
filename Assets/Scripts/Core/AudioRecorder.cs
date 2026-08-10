@@ -12,7 +12,7 @@ public class AudioRecorder : MonoBehaviour
     [Tooltip("Lower default threshold (0.005) allows quiet speech in quiet rooms to register easily.")]
     public float silenceThreshold = 0.005f; 
     public float silenceDurationToStop = 1.5f;
-    public float maxRecordingLength = 30f;
+    public float maxRecordingLength = 5f;
     public float minRecordingLength = 0.5f;
 
     [Header("Noise Calibration")]
