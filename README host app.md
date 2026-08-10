@@ -58,7 +58,7 @@ GET /auth/me
 Authorization: Bearer <access_token>
 ```
 
-Returns `{ id, employee_code, name, photo_url }`. `photo_url` is a full URL you can load directly into an image view; `null` if no photo was uploaded at registration.
+Returns `{ id, employee_code, name, photo_url, floor_room }`. `photo_url` is a full URL you can load directly into an image view; `null` if no photo was uploaded at registration. `floor_room` is a free-text string (e.g. `"3rd Floor, Room 12"`); `null` if not yet set.
 
 ### App screens
 
@@ -244,11 +244,64 @@ Note on "Wait": choosing Wait does **not** remove the alert from `/host/pending-
 
 ---
 
+### Alert history
+
+Resolved alerts (host responded `"available"` or `"not_available"`) — not `"wait"` or unresponded ones, those stay in `/host/pending-alerts`.
+
+​`
+GET /host/alert-history?limit=20&offset=0
+Authorization: Bearer <access_token>
+​`
+
+`limit` (default 20, max 100) and `offset` (default 0) are optional query params for pagination.
+
+Response shape:
+
+​`json
+{
+  "history": [
+    {
+      "visitor_id": 123,
+      "session_id": "...",
+      "visitor_name": "...",
+      "visitor_photo_url": "...",
+      "purpose": "...",
+      "arrived_at": "2026-08-02T10:15:00",
+      "host_response": "available",
+      "available_again_at": null
+    }
+  ],
+  "total": 87,
+  "limit": 20,
+  "offset": 0,
+  "has_more": true
+}
+​`
+
+Ordered newest-first (opposite of `/host/pending-alerts`, which is oldest-first). Use `has_more` to know whether to fetch the next page (`offset += limit`) — e.g. "load more" button or infinite scroll.
+
+### Updating floor/room
+
+Lets the logged-in host update their own floor/room — resolved from the token, no `employee_id` needed.
+
+​`
+PATCH /host/profile/floor-room
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{ "floor_room": "3rd Floor, Room 12" }
+​`
+
+Success response:
+
+​`json
+{ "detail": "Floor/room updated", "floor_room": "3rd Floor, Room 12" }
+​`
+
+Current value is also returned by `GET /auth/me` (see above) — no separate GET needed for display.
+
 ## Not built yet
 
-- Visit history endpoint (`GET /host/alert-history` or similar — will show resolved alerts, i.e. `host_response` of `"available"` or `"not_available"`)
-- QR-based visitor status page — visitor scans a QR code at the kiosk and sees their own status page. Needs a hosted page from the frontend side; see note below.
-- Visit history endpoint
 - Password reset flow
 - Admin UI for creating employees (internal tool, separate from both deliverables above)
 

@@ -108,4 +108,5 @@ def me(request: Request, current_employee: Employee = Depends(get_current_employ
         "employee_code": current_employee.employee_code,
         "name": current_employee.name,
         "photo_url": photo_url,
+        "floor_room": current_employee.floor_room,
     }
