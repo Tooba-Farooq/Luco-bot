@@ -253,11 +253,11 @@
   <script>
     const API_BASE = window.location.hostname === "localhost"
       ? "ws://localhost:8000"
-      : "wss://take-awaken-cactus.ngrok-free.dev";
+      : "wss://snub-tactics-impatient.ngrok-free.dev";
 
     const HTTP_BASE = window.location.hostname === "localhost"
       ? "http://localhost:8000"
-      : "https://take-awaken-cactus.ngrok-free.dev";
+      : "https://snub-tactics-impatient.ngrok-free.dev";
 
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
@@ -282,7 +282,6 @@
       error: "⚠️",
     };
 
-    let currentSessionId = null;
     let mode = "type";
     let mediaRecorder = null;
     let recordedChunks = [];
@@ -367,14 +366,14 @@
     });
 
     // Sending message
-    sendMessageBtn.addEventListener("click", async () => {
-      if (!currentSessionId) {
-        recordStatus.textContent = "No active session yet — please wait.";
-        return;
-      }
+      sendMessageBtn.addEventListener("click", async () => {
+  if (!token) {
+    recordStatus.textContent = "Missing status token.";
+    return;
+  }
 
-      const formData = new FormData();
-      formData.append("session_id", currentSessionId);
+  const formData = new FormData();
+  formData.append("status_token", token);
 
       if (mode === "type") {
         const text = messageText.value.trim();
@@ -437,11 +436,6 @@
 
         console.log("Received WebSocket data:", data);
         console.log("session_id =", data.session_id);
-
-        if (data.session_id) {
-            currentSessionId = data.session_id;
-            console.log("Current session ID:", currentSessionId);
-        }
 
         if (data.host_response === null || data.host_response === undefined) {
             const who = data.host_name || "your host";

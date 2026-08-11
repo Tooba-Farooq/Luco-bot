@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lucobot Admin — Employee Directory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #12151c;
+    --panel: #1a1e28;
+    --panel-border: #262b38;
+    --ink: #eae7de;
+    --ink-dim: #9a9fb0;
+    --badge: #f4f0e6;
+    --badge-ink: #1b1f29;
+    --badge-dim: #6b6555;
+    --amber: #e8a33d;
+    --teal: #3fa796;
+    --danger: #e2665f;
+    --radius: 14px;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection{ background: var(--teal); color: var(--badge-ink); }
+  :focus-visible{ outline: 2px solid var(--teal); outline-offset: 2px; }
+  a{ color: var(--teal); }
+  header.top{
+    position: sticky; top:0; z-index: 20;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 18px 28px;
+    background: rgba(18,21,28,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .brand{ display:flex; flex-direction:column; gap:2px; }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--teal);
+  }
+  h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight: 700; font-size: 22px; margin:0; letter-spacing: -0.01em;
+  }
+
+  .field label{
+    display:block; font-size: 12px; color: var(--ink-dim); margin-bottom: 6px;
+    font-family:'IBM Plex Mono', monospace; letter-spacing: 0.03em;
+  }
+  input[type=text], input[type=email], input[type=tel], input[type=url]{
+    width:100%; background: var(--panel); border:1px solid var(--panel-border);
+    color: var(--ink); border-radius: 8px; padding: 9px 11px; font-size: 14px;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  input::placeholder{ color: #565c6e; }
+
+  main{
+    max-width: 1180px; margin: 0 auto; padding: 28px;
+    display:grid; grid-template-columns: 340px 1fr; gap: 28px; align-items:start;
+  }
+  @media (max-width: 860px){
+    main{ grid-template-columns: 1fr; }
+  }
+
+  #form-panel{
+    background: var(--panel); border:1px solid var(--panel-border);
+    border-radius: var(--radius); padding: 22px; position: sticky; top: 92px;
+  }
+  #form-panel h2{
+    font-family:'Space Grotesk', sans-serif; font-size: 17px; margin: 0 0 4px;
+  }
+  #form-panel .sub{ color: var(--ink-dim); font-size: 13px; margin: 0 0 18px; }
+
+  .field{ margin-bottom: 14px; }
+  .field .req{ color: var(--amber); }
+  #photo-drop{
+    border: 1.5px dashed var(--panel-border); border-radius: 10px;
+    padding: 14px; text-align:center; cursor:pointer;
+    display:flex; align-items:center; gap: 12px;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  #photo-drop:hover{ border-color: var(--teal); }
+  #photo-drop.has-file{ border-style: solid; }
+  #photo-preview{
+    width:44px; height:44px; border-radius: 8px; object-fit: cover;
+    background: #0e1116; flex-shrink:0; display:none;
+  }
+  #photo-drop-text{ font-size: 13px; color: var(--ink-dim); text-align:left; }
+  #photo-drop-text b{ color: var(--ink); font-weight:500; }
+  input[type=file]{ display:none; }
+
+  button.primary{
+    width:100%; margin-top: 6px;
+    background: var(--teal); color: #0d1a18; border:none; border-radius: 10px;
+    padding: 12px 14px; font-weight: 600; font-size: 14px; cursor:pointer;
+    font-family:'IBM Plex Sans', sans-serif;
+    transition: filter .15s ease, transform .05s ease;
+  }
+  button.primary:hover{ filter: brightness(1.08); }
+  button.primary:active{ transform: translateY(1px); }
+  button.primary:disabled{ opacity: 0.55; cursor: not-allowed; filter:none; }
+
+  .form-msg{ font-size: 13px; margin-top: 12px; padding: 10px 12px; border-radius: 8px; display:none; }
+  .form-msg.error{ display:block; background: rgba(226,102,95,0.12); color:#f2a29d; border:1px solid rgba(226,102,95,0.35); }
+  .form-msg.ok{ display:block; background: rgba(63,167,150,0.12); color:#8fd9cb; border:1px solid rgba(63,167,150,0.35); }
+  #directory-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
+  #directory-head h2{ font-family:'Space Grotesk', sans-serif; font-size: 17px; margin:0; }
+  #count{ color: var(--ink-dim); font-size: 13px; font-family:'IBM Plex Mono', monospace; }
+  #directory-tools{ display:flex; gap: 10px; align-items:center; }
+  #search{ width: 200px; }
+  .icon-btn{
+    background: var(--panel); border:1px solid var(--panel-border); color: var(--ink-dim);
+    height:38px; padding: 0 14px; border-radius: 8px; cursor:pointer; font-size:13px;
+    font-family:'IBM Plex Sans', sans-serif;
+  }
+  .icon-btn:hover{ color: var(--ink); border-color: var(--teal); }
+
+  #grid{
+    display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px;
+  }
+
+  .empty-state{
+    grid-column: 1/-1; border: 1px dashed var(--panel-border); border-radius: var(--radius);
+    padding: 48px 20px; text-align:center; color: var(--ink-dim);
+  }
+  .empty-state b{ color: var(--ink); }
+  .badge{
+    position: relative; background: var(--badge); color: var(--badge-ink);
+    border-radius: 6px 6px 18px 18px; padding: 26px 16px 14px;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.28);
+    animation: rise .35s ease both;
+  }
+  @keyframes rise{ from{ opacity:0; transform: translateY(6px);} to{ opacity:1; transform:none; } }
+  .badge .clip{
+    position:absolute; top:-9px; left: 50%; transform: translateX(-50%);
+    width: 46px; height: 16px; border-radius: 4px;
+    background: var(--teal);
+  }
+  .badge .hole{
+    position:absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--bg);
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,0.08);
+  }
+  .badge-top{ display:flex; gap: 12px; align-items:center; margin-top: 10px; }
+  .avatar{
+    width: 52px; height: 52px; border-radius: 10px; object-fit: cover;
+    background: #d9d3c3; flex-shrink: 0;
+  }
+  .avatar-fallback{
+    width: 52px; height: 52px; border-radius: 10px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk', sans-serif; font-weight:700; font-size: 17px; color: #f4f0e6;
+  }
+  .badge-name{ font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:15px; line-height:1.25; }
+  .badge-room{ font-size: 12px; color: var(--badge-dim); margin-top: 2px; }
+  .badge-meta{ margin-top: 12px; font-size: 12px; color: var(--badge-dim); line-height:1.6; word-break: break-word; }
+  .badge-meta div{ display:flex; gap:6px; }
+  .badge-meta span.k{ color: #8a8471; min-width: 16px; }
+
+  .badge-code{
+    margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(27,31,41,0.25);
+    display:flex; align-items:center; justify-content:space-between; gap: 8px;
+  }
+  .code-tag{
+    font-family:'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.08em;
+    background: rgba(27,31,41,0.06); padding: 4px 8px; border-radius: 5px;
+  }
+  .badge-actions{ margin-top: 10px; display:flex; gap: 8px; flex-wrap:wrap; }
+  .chip-btn{
+    font-family:'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.02em;
+    background: transparent; border: 1px solid rgba(27,31,41,0.2); color: var(--badge-ink);
+    padding: 6px 9px; border-radius: 6px; cursor:pointer;
+  }
+  .chip-btn:hover{ border-color: var(--badge-ink); }
+  .chip-btn.done{ color: var(--teal); border-color: var(--teal); }
+  .no-email-note{ font-size: 11px; color: #a1785a; margin-top: 8px; }
+
+  footer{
+    max-width: 1180px; margin: 0 auto; padding: 8px 28px 40px;
+    color: var(--ink-dim); font-size: 12px;
+  }
+  .app-hidden{ display:none; }
+  #gate{
+    min-height: 100vh; display:flex; align-items:center; justify-content:center;
+    padding: 24px;
+  }
+  #gate-card{
+    width: 100%; max-width: 340px; background: var(--panel); border:1px solid var(--panel-border);
+    border-radius: var(--radius); padding: 28px 26px; text-align:center;
+  }
+  #gate-card .eyebrow{ display:block; margin-bottom: 6px; }
+  #gate-card h1{ font-size: 19px; margin-bottom: 6px; }
+  #gate-card p{ color: var(--ink-dim); font-size: 13px; margin: 0 0 18px; }
+  #gate-card input[type=password]{ text-align:center; letter-spacing: 0.08em; }
+  #gate-card button{ margin-top: 12px; }
+  #gate-msg{ min-height: 18px; font-size: 12px; color: var(--danger); margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div id="gate-card">
+    <span class="eyebrow">Lucobot</span>
+    <h1>Admin access</h1>
+    <p>Enter the admin password to open the employee directory.</p>
+    <form id="gate-form">
+      <input type="password" id="gate-password" placeholder="Password" autocomplete="current-password" autofocus />
+      <button type="submit" class="primary">Unlock</button>
+      <div id="gate-msg"></div>
+    </form>
+  </div>
+</div>
+
+<div id="app" class="app-hidden">
+
+<header class="top">
+  <div class="brand">
+    <div class="eyebrow">Lucobot</div>
+    <h1>Employee Directory</h1>
+  </div>
+</header>
+
+<main>
+  <section id="form-panel">
+    <h2>Print a badge</h2>
+    <p class="sub">Adds an employee and, if an email is on file, sends them an activation link automatically.</p>
+    <form id="employee-form">
+      <div class="field">
+        <label for="f-name">Name <span class="req">*</span></label>
+        <input type="text" id="f-name" required autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="f-photo">Photo <span class="req">*</span></label>
+        <div id="photo-drop">
+          <img id="photo-preview" alt="" />
+          <div id="photo-drop-text"><b>Choose a photo</b></div>
+        </div>
+        <input type="file" id="f-photo" accept="image/*" required />
+      </div>
+      <div class="field">
+        <label for="f-room">Floor / room</label>
+        <input type="text" id="f-room" placeholder="3rd Floor, Room 12" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="f-phone">Phone number</label>
+        <input type="tel" id="f-phone" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="f-email">Email</label>
+        <input type="email" id="f-email" placeholder="Leave blank to skip the invite email" autocomplete="off" />
+      </div>
+      <button type="submit" class="primary" id="submit-btn">Print badge</button>
+      <div class="form-msg" id="form-msg"></div>
+    </form>
+  </section>
+
+  <section id="directory">
+    <div id="directory-head">
+      <h2>All employees <span id="count"></span></h2>
+      <div id="directory-tools">
+        <input type="text" id="search" placeholder="Filter by name…" />
+        <button class="icon-btn" id="refresh-btn">Refresh</button>
+      </div>
+    </div>
+    <div id="grid">
+      <div class="empty-state" id="loading-state">Loading directory…</div>
+    </div>
+  </section>
+</main>
+
+<footer></footer>
+
+</div><!-- #app -->
+<script>
+  const DEFAULT_API_BASE = 'https://snub-tactics-impatient.ngrok-free.dev';
+  const DEFAULT_ACTIVATE_BASE = 'https://luco-bot-activation.netlify.app';
+
+  // Password gate. This is a client-side speed bump only — anyone can view-source
+  // this file and read ADMIN_PASSWORD_HASH, so it does NOT replace real auth.
+  const ADMIN_PASSWORD_HASH = '6a1f63c93aa7d7b6da64bbf2a4564e7a915bf8a495bc65aa45fc0f1b4a068f32';
+
+  async function sha256Hex(text){
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  document.getElementById('gate-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const entered = document.getElementById('gate-password').value;
+    const msg = document.getElementById('gate-msg');
+    const hash = await sha256Hex(entered);
+    if (hash === ADMIN_PASSWORD_HASH){
+      document.getElementById('gate').style.display = 'none';
+      document.getElementById('app').classList.remove('app-hidden');
+      loadEmployees();
+    } else {
+      msg.textContent = 'Wrong password.';
+      document.getElementById('gate-password').value = '';
+      document.getElementById('gate-password').focus();
+    }
+  });
+  function apiBase(){ return DEFAULT_API_BASE.trim().replace(/\/$/, ''); }
+  function activateBase(){ return DEFAULT_ACTIVATE_BASE.trim().replace(/\/$/, ''); }
+  const AVATAR_COLORS = ['#3fa796', '#e8a33d', '#c97b63', '#6b7fb0', '#8a8fd6'];
+  function colorFor(str){
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return AVATAR_COLORS[h % AVATAR_COLORS.length];
+  }
+  function initials(name){
+    return (name || '?').trim().split(/\s+/).slice(0,2).map(w => w[0]?.toUpperCase() || '').join('') || '?';
+  }
+
+  let allEmployees = [];
+
+  function renderGrid(){
+    const grid = document.getElementById('grid');
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    const list = q ? allEmployees.filter(e => (e.name || '').toLowerCase().includes(q)) : allEmployees;
+
+    document.getElementById('count').textContent = allEmployees.length ? `(${allEmployees.length})` : '';
+
+    if (!allEmployees.length){
+      grid.innerHTML = `<div class="empty-state"><b>No badges printed yet.</b><br/>Add the first employee to get started.</div>`;
+      return;
+    }
+    if (!list.length){
+      grid.innerHTML = `<div class="empty-state">No employees match "<b>${escapeHtml(q)}</b>".</div>`;
+      return;
+    }
+
+    grid.innerHTML = list.map(cardHtml).join('');
+
+    list.forEach(e => {
+      const img = document.getElementById(`avatar-${e.id}`);
+      if (img) img.addEventListener('error', () => showFallback(e.id), { once: true });
+    });
+
+    list.forEach(e => {
+      if (!e.invite_token) return;
+      const btn = document.getElementById(`copy-${e.id}`);
+      if (!btn) return;
+      btn.addEventListener('click', () => copyInvite(e, btn));
+    });
+  }
+
+  function showFallback(id){
+    const img = document.getElementById(`avatar-${id}`);
+    const fb = document.getElementById(`avatar-fb-${id}`);
+    if (img) img.style.display = 'none';
+    if (fb) fb.style.display = 'flex';
+  }
+
+  function escapeHtml(s){
+    return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function cardHtml(e){
+    const photoUrl = e.photo_path ? `${apiBase()}/${e.photo_path}`.replace(/([^:]\/)\/+/g, '$1') : '';
+    const bg = colorFor(e.name || String(e.id));
+    return `
+      <div class="badge">
+        <div class="clip"></div>
+        <div class="hole"></div>
+        <div class="badge-top">
+          ${photoUrl ? `<img id="avatar-${e.id}" class="avatar" src="${photoUrl}" alt="" />` : ''}
+          <div id="avatar-fb-${e.id}" class="avatar-fallback" style="background:${bg}; display:${photoUrl ? 'none' : 'flex'};">${initials(e.name)}</div>
+          <div>
+            <div class="badge-name">${escapeHtml(e.name)}</div>
+            ${e.floor_room ? `<div class="badge-room">${escapeHtml(e.floor_room)}</div>` : ''}
+          </div>
+        </div>
+        <div class="badge-meta">
+          ${e.email ? `<div><span class="k">@</span>${escapeHtml(e.email)}</div>` : ''}
+          ${e.phone_number ? `<div><span class="k">#</span>${escapeHtml(e.phone_number)}</div>` : ''}
+        </div>
+        <div class="badge-code">
+          <span class="code-tag">${escapeHtml(e.employee_code || '—')}</span>
+        </div>
+        ${e.invite_token ? `
+          <div class="badge-actions">
+            <button class="chip-btn" id="copy-${e.id}">Copy invite link</button>
+          </div>
+          ${!e.email ? `<div class="no-email-note">No email on file — invite wasn't sent automatically.</div>` : ''}
+        ` : ''}
+      </div>
+    `;
+  }
+  async function copyInvite(e, btn){
+    const base = activateBase();
+    const link = base ? `${base}?token=${e.invite_token}` : e.invite_token;
+    try{
+      await navigator.clipboard.writeText(link);
+      btn.textContent = base ? 'Link copied' : 'Token copied (set activation URL for a full link)';
+      btn.classList.add('done');
+      setTimeout(() => { btn.textContent = 'Copy invite link'; btn.classList.remove('done'); }, 2200);
+    }catch(err){
+      alert(link);
+    }
+  }
+
+  async function loadEmployees(){
+    const grid = document.getElementById('grid');
+    if (!apiBase()){
+      grid.innerHTML = `<div class="empty-state">Set <b>DEFAULT_API_BASE</b> near the top of the file's script to load the directory.</div>`;
+      return;
+    }
+    grid.innerHTML = `<div class="empty-state" id="loading-state">Loading directory…</div>`;
+    try{
+      const res = await fetch(`${apiBase()}/employees`);
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      allEmployees = await res.json();
+      renderGrid();
+    }catch(err){
+      grid.innerHTML = `<div class="empty-state">Couldn't load the directory — ${escapeHtml(err.message)}.<br/></div>`;
+    }
+  }
+
+  document.getElementById('refresh-btn').addEventListener('click', loadEmployees);
+  document.getElementById('search').addEventListener('input', renderGrid);
+
+  const photoDrop = document.getElementById('photo-drop');
+  const photoInput = document.getElementById('f-photo');
+  const photoPreview = document.getElementById('photo-preview');
+  const photoDropText = document.getElementById('photo-drop-text');
+  photoDrop.addEventListener('click', () => photoInput.click());
+  photoInput.addEventListener('change', () => {
+    const file = photoInput.files[0];
+    if (!file) return;
+    photoDrop.classList.add('has-file');
+    photoPreview.style.display = 'block';
+    photoPreview.src = URL.createObjectURL(file);
+    photoDropText.innerHTML = `<b>${escapeHtml(file.name)}</b><br/>Click to choose a different photo.`;
+  });
+
+  const form = document.getElementById('employee-form');
+  const submitBtn = document.getElementById('submit-btn');
+  const formMsg = document.getElementById('form-msg');
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    formMsg.className = 'form-msg';
+    formMsg.textContent = '';
+
+    if (!apiBase()){
+      formMsg.className = 'form-msg error';
+      formMsg.textContent = 'Set DEFAULT_API_BASE near the top of the file\'s script first.';
+      return;
+    }
+    if (!photoInput.files[0]){
+      formMsg.className = 'form-msg error';
+      formMsg.textContent = 'A photo is required.';
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append('name', document.getElementById('f-name').value.trim());
+    fd.append('floor_room', document.getElementById('f-room').value.trim());
+    fd.append('phone_number', document.getElementById('f-phone').value.trim());
+    fd.append('email', document.getElementById('f-email').value.trim());
+    fd.append('photo', photoInput.files[0]);
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Printing…';
+
+    try{
+      const res = await fetch(`${apiBase()}/employees`, { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok){
+        throw new Error(data.detail || `Server returned ${res.status}`);
+      }
+      formMsg.className = 'form-msg ok';
+      formMsg.textContent = `Badge printed — ${data.name} is ${data.employee_code}.${data.email ? ' Invite email sent.' : ''}`;
+      form.reset();
+      photoDrop.classList.remove('has-file');
+      photoPreview.style.display = 'none';
+      photoDropText.innerHTML = `<b>Choose a photo</b><br/>Shown on the kiosk when they're paged.`;
+      allEmployees.unshift(data);
+      renderGrid();
+    }catch(err){
+      formMsg.className = 'form-msg error';
+      formMsg.textContent = `Couldn't print badge — ${err.message}`;
+    }finally{
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Print badge';
+    }
+  });
+
+</script>
+</body>
+</html>
