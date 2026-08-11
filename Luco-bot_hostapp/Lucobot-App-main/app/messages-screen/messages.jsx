@@ -81,15 +81,21 @@ export default function MessagesScreen({ goToHome }) {
   const renderThread = ({ item }) => (
     <View style={styles.card}>
       <View style={styles.headerRow}>
-        {item.visitor_photo_url ? (
-          <Image source={{ uri: item.visitor_photo_url }} style={styles.photo} />
-        ) : (
-          <View style={styles.photoPlaceholder}>
-            <Text style={styles.photoInitial}>
-              {item.visitor_name?.charAt(0)?.toUpperCase() || "?"}
-            </Text>
-          </View>
-        )}
+      {item.visitor_photo_url ? (
+  <Image
+    source={{
+      uri: item.visitor_photo_url,
+      headers: { 'ngrok-skip-browser-warning': 'true' },
+    }}
+    style={styles.photo}
+  />
+) : (
+  <View style={styles.photoPlaceholder}>
+    <Text style={styles.photoInitial}>
+      {item.visitor_name?.charAt(0)?.toUpperCase() || "?"}
+    </Text>
+  </View>
+)}
         <View>
           <Text style={styles.name}>{item.visitor_name}</Text>
           <Text style={styles.count}>

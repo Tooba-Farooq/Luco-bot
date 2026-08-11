@@ -18,7 +18,6 @@ function parseUTC(isoString) {
   return new Date(hasTZ ? isoString : isoString + "Z");
 }
 
-// Returns minutes waited, or 0 if just arrived / invalid
 function minutesWaiting(arrivedAt) {
   const arrived = parseUTC(arrivedAt);
   if (!arrived) return 0;
@@ -26,9 +25,8 @@ function minutesWaiting(arrivedAt) {
   return Math.max(0, Math.floor(diffMs / 60000));
 }
 
-// Urgency thresholds — tweak these two numbers to change when colors escalate
-const WAIT_WARNING_MIN = 8;   // amber from here
-const WAIT_URGENT_MIN = 20;   // red from here
+const WAIT_WARNING_MIN = 8;
+const WAIT_URGENT_MIN = 20;
 
 function getUrgency(minutes) {
   if (minutes >= WAIT_URGENT_MIN) return "urgent";
@@ -38,10 +36,9 @@ function getUrgency(minutes) {
 
 const WAIT_OPTIONS = [5, 10, 30, 60, 120];
 
-export default function AlertScreen({ alerts, onResolved, goToHome }) {
+export default function AlertScreen({ alerts, onResolved, goToHome, goToMessages }) {
   const [waitModalFor, setWaitModalFor] = useState(null);
   const [submitting, setSubmitting] = useState(null);
-  // Forces re-render every 30s so "waiting X min" badges update live
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -52,8 +49,8 @@ export default function AlertScreen({ alerts, onResolved, goToHome }) {
   const handleRespond = async (sessionId, response, waitMinutes) => {
     setSubmitting(sessionId);
     try {
-      await respondToAlert(sessionId, response, waitMinutes);
-      onResolved(sessionId, response, waitMinutes);
+      const result = await respondToAlert(sessionId, response, waitMinutes);
+      onResolved(sessionId, response, result);
     } catch (err) {
       console.error("Respond failed:", err);
       Alert.alert("Error", err.message || "Could not send response");
@@ -82,14 +79,20 @@ export default function AlertScreen({ alerts, onResolved, goToHome }) {
         )}
 
         {item.visitor_photo_url ? (
-          <Image source={{ uri: item.visitor_photo_url }} style={styles.photo} />
-        ) : (
-          <View style={styles.photoPlaceholder}>
-            <Text style={styles.photoInitial}>
-              {item.visitor_name?.charAt(0)?.toUpperCase() || "?"}
-            </Text>
-          </View>
-        )}
+  <Image
+    source={{
+      uri: item.visitor_photo_url,
+      headers: { 'ngrok-skip-browser-warning': 'true' },
+    }}
+    style={styles.photo}
+  />
+) : (
+  <View style={styles.photoPlaceholder}>
+    <Text style={styles.photoInitial}>
+      {item.visitor_name?.charAt(0)?.toUpperCase() || "?"}
+    </Text>
+  </View>
+)}
 
         <Text style={styles.name}>{item.visitor_name}</Text>
         <Text style={styles.purpose}>{item.purpose}</Text>
@@ -174,6 +177,10 @@ export default function AlertScreen({ alerts, onResolved, goToHome }) {
           contentContainerStyle={{ paddingBottom: 24 }}
         />
       )}
+
+      <TouchableOpacity style={styles.homeButton} onPress={goToMessages}>
+        <Text style={styles.homeButtonText}>View Messages</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.homeButton} onPress={goToHome}>
         <Text style={styles.homeButtonText}>Back to Home</Text>

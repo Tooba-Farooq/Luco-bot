@@ -14,7 +14,7 @@ export default function Home({ goToLogin, goToAlerts, goToMessages })  {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
- const loadProfile = useCallback(async () => {
+  const loadProfile = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -72,7 +72,9 @@ export default function Home({ goToLogin, goToAlerts, goToMessages })  {
   return (
     <View style={styles.container}>
       {employee?.photo_url ? (
-        <Image source={{ uri: employee.photo_url }} style={styles.avatar} />
+        <Image source={{ uri: employee.photo_url,
+          headers: { 'ngrok-skip-browser-warning': 'true' },
+        }} style={styles.avatar} />
       ) : (
         <View style={styles.avatarPlaceholder}>
           <Text style={styles.avatarInitial}>
@@ -171,15 +173,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   messagesButton: {
-  marginTop: 16,
-  paddingVertical: 12,
-  paddingHorizontal: 32,
-  borderRadius: 8,
-  backgroundColor: "#1e293b",
-  borderWidth: 1,
-  borderColor: "#334155",
-},
-messagesButtonText: { color: "#00bcd4", fontWeight: "600" },
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    backgroundColor: "#1e293b",
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  messagesButtonText: { color: "#00bcd4", fontWeight: "600" },
   logoutButton: {
     marginTop: 48,
     paddingVertical: 12,
