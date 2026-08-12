@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { getHostMessages } from "../api/client";
 
 function parseUTC(isoString) {
@@ -49,6 +51,8 @@ export function groupThreads(messages) {
   });
 }
 
+const POLL_INTERVAL_MS = 15000;
+
 export default function MessagesScreen({ goToThread }) {
   const [rawMessages, setRawMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +75,9 @@ export default function MessagesScreen({ goToThread }) {
 
   useEffect(() => {
     load();
+    // Poll for new messages since there's no push channel for /host/messages.
+    const interval = setInterval(load, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
   }, [load]);
 
   const onRefresh = () => {
@@ -83,27 +90,34 @@ export default function MessagesScreen({ goToThread }) {
   const renderThread = ({ item: t }) => {
     const last = t.messages[t.messages.length - 1];
     return (
-      <TouchableOpacity style={styles.card} onPress={() => goToThread(t.visitor_id)}>
-        {t.visitor_photo_url ? (
-          <Image
-            source={{ uri: t.visitor_photo_url, headers: { "ngrok-skip-browser-warning": "true" } }}
-            style={styles.photo}
-          />
-        ) : (
-          <View style={styles.photoPlaceholder}>
-            <Text style={styles.photoInitial}>{t.visitor_name?.charAt(0)?.toUpperCase() || "?"}</Text>
+      <TouchableOpacity onPress={() => goToThread(t.visitor_id)}>
+        <LinearGradient
+          colors={["#1e293b", "#16233b"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.card}
+        >
+          {t.visitor_photo_url ? (
+            <Image
+              source={{ uri: t.visitor_photo_url, headers: { "ngrok-skip-browser-warning": "true" } }}
+              style={styles.photo}
+            />
+          ) : (
+            <View style={styles.photoPlaceholder}>
+              <Text style={styles.photoInitial}>{t.visitor_name?.charAt(0)?.toUpperCase() || "?"}</Text>
+            </View>
+          )}
+          <View style={styles.middle}>
+            <Text style={styles.name} numberOfLines={1}>{t.visitor_name}</Text>
+            <Text style={styles.preview} numberOfLines={1}>{last.message_text}</Text>
           </View>
-        )}
-        <View style={styles.middle}>
-          <Text style={styles.name} numberOfLines={1}>{t.visitor_name}</Text>
-          <Text style={styles.preview} numberOfLines={1}>{last.message_text}</Text>
-        </View>
-        <View style={styles.right}>
-          <Text style={styles.stamp}>{fmtStamp(last.left_at)}</Text>
-          <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{t.messages.length}</Text>
+          <View style={styles.right}>
+            <Text style={styles.stamp}>{fmtStamp(last.left_at)}</Text>
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{t.messages.length}</Text>
+            </View>
           </View>
-        </View>
+        </LinearGradient>
       </TouchableOpacity>
     );
   };
@@ -118,12 +132,14 @@ export default function MessagesScreen({ goToThread }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerBar}>
-        <Text style={styles.header}>Messages</Text>
-        <Text style={styles.headerSubtitle}>
-          {threads.length} visitor{threads.length !== 1 ? "s" : ""}
-        </Text>
-      </View>
+      <BlurView intensity={40} tint="dark" style={styles.glassHeader}>
+        <View style={styles.headerRow}>
+          <Text style={styles.header}>Messages</Text>
+          <Text style={styles.headerSubtitle}>
+            {threads.length} visitor{threads.length !== 1 ? "s" : ""}
+          </Text>
+        </View>
+      </BlurView>
 
       {error ? (
         <Text style={styles.errorText}>{error}</Text>
@@ -134,7 +150,7 @@ export default function MessagesScreen({ goToThread }) {
           data={threads}
           keyExtractor={(t) => String(t.visitor_id)}
           renderItem={renderThread}
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={{ paddingBottom: 120 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00bcd4" />}
         />
       )}
@@ -145,21 +161,34 @@ export default function MessagesScreen({ goToThread }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0f172a", padding: 16 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#0f172a" },
-  headerBar: { marginBottom: 16, marginTop: 8 },
+  glassHeader: {
+    borderRadius: 20,
+    padding: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.15)",
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  headerRow: {},
   header: { fontSize: 22, color: "#fff", fontWeight: "600" },
   headerSubtitle: { fontSize: 13, color: "#64748b", marginTop: 2 },
   empty: { color: "#64748b", fontSize: 14, textAlign: "center", marginTop: 40 },
   errorText: { color: "#f87171", textAlign: "center", marginTop: 40 },
   card: {
-    backgroundColor: "#1e293b",
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#334155",
     padding: 16,
     marginBottom: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   photo: { width: 48, height: 48, borderRadius: 24 },
   photoPlaceholder: {
@@ -173,11 +202,8 @@ const styles = StyleSheet.create({
   right: { alignItems: "flex-end" },
   stamp: { fontSize: 11, color: "#64748b" },
   countBadge: {
-    marginTop: 4,
-    backgroundColor: "rgba(0, 188, 212, 0.15)",
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    marginTop: 4, backgroundColor: "rgba(0, 188, 212, 0.15)",
+    borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2,
   },
   countBadgeText: { fontSize: 11, fontWeight: "600", color: "#00bcd4" },
 });

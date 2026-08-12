@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { getMe, getPendingAlerts, respondToAlert, logout as logoutClient } from "../api/client";
+import { getMe, respondToAlert, logout as logoutClient } from "../api/client";
 
 const WAIT_OPTIONS = [5, 10, 30, 60, 120];
 
@@ -81,12 +81,14 @@ function AlertCard({ alert, onRespond }) {
         <Text style={styles.waitedText}>{waitedMin}m</Text>
       </View>
 
-      {waiting ? (
+      {waiting && (
         <Text style={styles.waitingNote}>
           You asked them to wait
           {waitUntil ? ` — until ${parseUTC(waitUntil)?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}
         </Text>
-      ) : pickingWait ? (
+      )}
+
+      {pickingWait ? (
         <View style={styles.waitPicker}>
           <Text style={styles.waitPickerLabel}>Wait how long?</Text>
           <View style={styles.waitOptions}>
@@ -119,7 +121,7 @@ function AlertCard({ alert, onRespond }) {
             disabled={sending}
             onPress={() => setPickingWait(true)}
           >
-            <Text style={styles.actionTextMuted}>Ask to Wait</Text>
+            <Text style={styles.actionTextMuted}>{waiting ? "Extend Wait" : "Ask to Wait"}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtnFull, styles.actionDecline]}
@@ -134,9 +136,8 @@ function AlertCard({ alert, onRespond }) {
   );
 }
 
-export default function Home({ goToLogin, goToAlerts, goToMessages }) {
+export default function Home({ goToLogin, goToAlerts, goToMessages, pending, onAlertResolved, onRefresh }) {
   const [employee, setEmployee] = useState(null);
-  const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -149,10 +150,10 @@ export default function Home({ goToLogin, goToAlerts, goToMessages }) {
       const data = await getMe();
       setEmployee(data);
 
-      const alertData = await getPendingAlerts();
-      setPending(alertData.pending ?? []);
-      // No auto-redirect to full-screen AlertScreen here —
-      // pending alerts render inline below instead.
+      // Pending alerts now live in App.js (shared with the tab badge and
+      // AlertScreen), so we just trigger a refresh there instead of
+      // keeping a separate local copy.
+      await onRefresh();
     } catch (err) {
       console.error("Failed to load profile:", err);
       if (err.message === "Refresh failed, session expired") {
@@ -164,27 +165,13 @@ export default function Home({ goToLogin, goToAlerts, goToMessages }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [goToLogin]);
+  }, [goToLogin, onRefresh]);
 
-  const onRefresh = () => loadProfile(true);
+  const onScreenRefresh = () => loadProfile(true);
 
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
-
-  const handleAlertResolved = (sessionId, response, result) => {
-    if (response === "wait") {
-      setPending((prev) =>
-        prev.map((a) =>
-          a.session_id === sessionId
-            ? { ...a, host_response: "wait", wait_until: result?.wait_until ?? null }
-            : a
-        )
-      );
-    } else {
-      setPending((prev) => prev.filter((a) => a.session_id !== sessionId));
-    }
-  };
 
   const handleLogout = async () => {
     await logoutClient();
@@ -217,7 +204,7 @@ export default function Home({ goToLogin, goToAlerts, goToMessages }) {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.containerContent}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00bcd4" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onScreenRefresh} tintColor="#00bcd4" />}
     >
       <BlurView intensity={40} tint="dark" style={styles.glassHeader}>
         {employee?.photo_url ? (
@@ -249,7 +236,7 @@ export default function Home({ goToLogin, goToAlerts, goToMessages }) {
             )}
           </View>
           {pending.map((a) => (
-            <AlertCard key={a.session_id} alert={a} onRespond={handleAlertResolved} />
+            <AlertCard key={a.session_id} alert={a} onRespond={onAlertResolved} />
           ))}
         </View>
       ) : (
@@ -261,7 +248,6 @@ export default function Home({ goToLogin, goToAlerts, goToMessages }) {
           </Text>
         </View>
       )}
-
     </ScrollView>
   );
 }
@@ -322,7 +308,7 @@ const styles = StyleSheet.create({
   alertPurpose: { fontSize: 12, color: "#94a3b8", marginTop: 1 },
   waitedText: { fontSize: 11, color: "#64748b", fontWeight: "600" },
 
-  waitingNote: { fontSize: 12, color: "#64748b", fontStyle: "italic" },
+  waitingNote: { fontSize: 12, color: "#64748b", fontStyle: "italic", marginBottom: 8 },
   waitPicker: { marginTop: 4 },
   waitPickerLabel: { fontSize: 12, color: "#94a3b8", marginBottom: 8 },
   waitOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -348,16 +334,6 @@ const styles = StyleSheet.create({
   idleText: { color: "#64748b", fontSize: 14, fontWeight: "600" },
   idleSubtext: { color: "#475569", fontSize: 12, marginTop: 4, textAlign: "center" },
 
-  messagesButton: {
-    marginTop: 24, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 10,
-    backgroundColor: "#1e293b", borderWidth: 1, borderColor: "#334155",
-  },
-  messagesButtonText: { color: "#00bcd4", fontWeight: "600" },
-  logoutButton: {
-    marginTop: 16, paddingVertical: 12, paddingHorizontal: 32,
-    borderRadius: 10, backgroundColor: "#dc2626",
-  },
-  logoutButtonText: { color: "#fff", fontWeight: "600" },
   errorText: { color: "#f87171", textAlign: "center", marginBottom: 16 },
   retryButton: {
     paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8,

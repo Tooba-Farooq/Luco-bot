@@ -8,6 +8,8 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { getAlertHistory } from "../api/client";
 
 const LIMIT = 20;
@@ -21,12 +23,7 @@ function parseUTC(isoString) {
 function fmtWhen(iso) {
   const d = parseUTC(iso);
   if (!d) return "";
-  return d.toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function fmtTime(iso) {
@@ -78,13 +75,15 @@ export default function HistoryScreen() {
   };
 
   const renderItem = ({ item }) => (
-    <View style={styles.card}>
+    <LinearGradient
+      colors={["#1e293b", "#16233b"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.card}
+    >
       {item.visitor_photo_url ? (
         <Image
-          source={{
-            uri: item.visitor_photo_url,
-            headers: { "ngrok-skip-browser-warning": "true" },
-          }}
+          source={{ uri: item.visitor_photo_url, headers: { "ngrok-skip-browser-warning": "true" } }}
           style={styles.photo}
         />
       ) : (
@@ -123,7 +122,7 @@ export default function HistoryScreen() {
           {item.host_response === "available" ? "Sent In" : "Not Available"}
         </Text>
       </View>
-    </View>
+    </LinearGradient>
   );
 
   if (loading) {
@@ -147,10 +146,10 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerBar}>
+      <BlurView intensity={40} tint="dark" style={styles.glassHeader}>
         <Text style={styles.header}>History</Text>
         <Text style={styles.headerSubtitle}>Resolved visitor alerts</Text>
-      </View>
+      </BlurView>
 
       {items.length === 0 ? (
         <Text style={styles.empty}>No resolved alerts yet.</Text>
@@ -159,14 +158,10 @@ export default function HistoryScreen() {
           data={items}
           keyExtractor={(item) => item.session_id}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={{ paddingBottom: 120 }}
           ListFooterComponent={
             hasMore ? (
-              <TouchableOpacity
-                style={styles.loadMoreButton}
-                onPress={loadMore}
-                disabled={loadingMore}
-              >
+              <TouchableOpacity style={styles.loadMoreButton} onPress={loadMore} disabled={loadingMore}>
                 {loadingMore ? (
                   <ActivityIndicator size="small" color="#00bcd4" />
                 ) : (
@@ -186,20 +181,32 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0f172a", padding: 16 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#0f172a" },
-  headerBar: { marginBottom: 16, marginTop: 8 },
+  glassHeader: {
+    borderRadius: 20,
+    padding: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.15)",
+    marginBottom: 16,
+    marginTop: 8,
+  },
   header: { fontSize: 22, color: "#fff", fontWeight: "600" },
   headerSubtitle: { fontSize: 13, color: "#64748b", marginTop: 2 },
   empty: { color: "#64748b", fontSize: 14, textAlign: "center", marginTop: 40 },
   card: {
-    backgroundColor: "#1e293b",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#334155",
+    borderRadius: 16,
     padding: 16,
     marginBottom: 10,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   photo: { width: 44, height: 44, borderRadius: 22 },
   photoPlaceholder: {
@@ -212,28 +219,19 @@ const styles = StyleSheet.create({
   purpose: { fontSize: 13, color: "#94a3b8", marginTop: 2 },
   arrived: { fontSize: 11, color: "#64748b", marginTop: 4 },
   returnNote: { fontSize: 11, color: "#fbbf24", marginTop: 4 },
-  responseTag: { borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8 },
+  responseTag: { borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8 },
   tagAvailable: { backgroundColor: "rgba(22, 163, 74, 0.2)" },
   tagUnavailable: { backgroundColor: "rgba(220, 38, 38, 0.15)" },
   responseTagText: { fontSize: 11, fontWeight: "600" },
   tagAvailableText: { color: "#4ade80" },
   tagUnavailableText: { color: "#fca5a5" },
   loadMoreButton: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: "#334155",
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
+    marginTop: 8, borderWidth: 1, borderColor: "#334155", borderRadius: 12,
+    paddingVertical: 12, alignItems: "center",
   },
   loadMoreText: { color: "#00bcd4", fontWeight: "600", fontSize: 14 },
   endText: { color: "#64748b", fontSize: 12, textAlign: "center", marginTop: 12 },
   errorText: { color: "#f87171", textAlign: "center", marginBottom: 16 },
-  retryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    backgroundColor: "#00bcd4",
-  },
+  retryButton: { paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8, backgroundColor: "#00bcd4" },
   retryButtonText: { color: "#0f172a", fontWeight: "600" },
 });

@@ -7,14 +7,19 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import { getHostMessages } from "../api/client";
 import { fmtStamp, groupThreads } from "./message";
 
+const POLL_INTERVAL_MS = 15000;
+
 export default function MessageThreadScreen({ visitorId, goBack }) {
   const [rawMessages, setRawMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
@@ -27,12 +32,21 @@ export default function MessageThreadScreen({ visitorId, goBack }) {
       setError("Couldn't load this conversation.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     load();
+    // Poll for new messages since there's no push channel for /host/messages.
+    const interval = setInterval(load, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
   }, [load]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    load();
+  };
 
   const thread = groupThreads(rawMessages).find((t) => t.visitor_id === visitorId);
 
@@ -50,7 +64,7 @@ export default function MessageThreadScreen({ visitorId, goBack }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerRow}>
+      <BlurView intensity={50} tint="dark" style={styles.glassHeaderRow}>
         <TouchableOpacity style={styles.backButton} onPress={goBack}>
           <Ionicons name="chevron-back" size={20} color="#00bcd4" />
         </TouchableOpacity>
@@ -78,7 +92,7 @@ export default function MessageThreadScreen({ visitorId, goBack }) {
             </Text>
           ) : null}
         </View>
-      </View>
+      </BlurView>
 
       {loading ? (
         <View style={styles.centered}>
@@ -101,6 +115,7 @@ export default function MessageThreadScreen({ visitorId, goBack }) {
           keyExtractor={(m) => m.session_id + m.left_at}
           renderItem={renderMessage}
           contentContainerStyle={{ padding: 16 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00bcd4" />}
         />
       )}
     </View>
@@ -111,22 +126,18 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0f172a" },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
   centeredPad: { padding: 24, alignItems: "center" },
-  headerRow: {
+  glassHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 16,
+    overflow: "hidden",
     borderBottomWidth: 1,
-    borderBottomColor: "#1e293b",
+    borderBottomColor: "rgba(148, 163, 184, 0.15)",
   },
-  backButton: {
-    borderWidth: 1,
-    borderColor: "#334155",
-    borderRadius: 10,
-    padding: 8,
-  },
+  backButton: { borderWidth: 1, borderColor: "#334155", borderRadius: 10, padding: 8 },
   avatar: { width: 36, height: 36, borderRadius: 18 },
   avatarPlaceholder: {
     width: 36, height: 36, borderRadius: 18,
@@ -146,25 +157,21 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
     alignSelf: "flex-start",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   purposeTag: {
-    alignSelf: "flex-start",
-    backgroundColor: "#334155",
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginBottom: 8,
+    alignSelf: "flex-start", backgroundColor: "#334155", borderRadius: 6,
+    paddingHorizontal: 8, paddingVertical: 2, marginBottom: 8,
   },
   purposeTagText: { fontSize: 11, color: "#94a3b8", fontWeight: "500" },
   messageText: { fontSize: 14, color: "#e2e8f0" },
   timestamp: { fontSize: 11, color: "#64748b", marginTop: 8 },
   empty: { color: "#64748b", fontSize: 14, textAlign: "center" },
   errorText: { color: "#f87171", textAlign: "center", marginBottom: 16 },
-  retryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    backgroundColor: "#00bcd4",
-  },
+  retryButton: { paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8, backgroundColor: "#00bcd4" },
   retryButtonText: { color: "#0f172a", fontWeight: "600" },
 });

@@ -45,20 +45,15 @@ export default function App() {
   // Central place to re-sync the pending-alerts badge/inline cards without
   // forcing a screen change. Safe to call from any listener.
   const refreshPendingAlerts = useCallback(async () => {
-  try {
-    const data = await getPendingAlerts();
-    setPendingAlerts(data.pending ?? []);   // was data.alerts ?? []
-  } catch (err) {
-    console.error('Failed to refresh pending alerts:', err);
-  }
-}, []);
-
-
+    try {
+      const data = await getPendingAlerts();
+      setPendingAlerts(data.pending ?? []);
+    } catch (err) {
+      console.error('Failed to refresh pending alerts:', err);
+    }
+  }, []);
 
   // Restore session on launch instead of always dropping to Login.
-  // Covers cold start AND the JS process getting killed in the
-  // background and relaunched — tokens live in SecureStore, so if
-  // they're still valid we should skip straight to Home.
   useEffect(() => {
     let cancelled = false;
 
@@ -68,20 +63,20 @@ export default function App() {
       let userData = null;
 
       try {
-        userData = await getMe(); // authFetch auto-refreshes an expired access token
+        userData = await getMe();
         nextScreen = 'home';
       } catch {
-        nextScreen = 'login'; // no tokens, or refresh token also expired/invalid
+        nextScreen = 'login';
       }
 
       const elapsed = Date.now() - start;
-      const remaining = Math.max(0, 1200 - elapsed); // brief splash, not a fixed 4s
+      const remaining = Math.max(0, 1200 - elapsed);
 
       setTimeout(async () => {
         if (cancelled) return;
         if (nextScreen === 'home') {
           setCurrentUser(userData);
-          await refreshPendingAlerts(); // badge is correct on first paint, not just after AppState change
+          await refreshPendingAlerts();
         }
         setCurrentScreen(nextScreen);
       }, remaining);
@@ -91,16 +86,11 @@ export default function App() {
   }, [refreshPendingAlerts]);
 
   useEffect(() => {
-    // Foreground: app is open, show in-app handling (banner already shown by handler above).
-    // Just refresh the badge/inline cards — don't force a redirect, since the
-    // user may be mid-task on another tab.
     notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
       console.log('Notification received in foreground:', notification.request.content.data);
       refreshPendingAlerts();
     });
 
-    // Background/killed: user tapped the tray notification — this is a deliberate
-    // "deal with this now" action, so go full-screen to AlertScreen.
     responseListener.current = Notifications.addNotificationResponseReceivedListener(async (response) => {
       const data = response.notification.request.content.data;
       console.log('Notification tapped:', data);
@@ -116,18 +106,13 @@ export default function App() {
     };
   }, [refreshPendingAlerts]);
 
-  // Per backend docs: check /host/pending-alerts "whenever the app opens
-  // or resumes, to catch anything unresolved regardless of whether a
-  // push was seen." Pushes are fire-and-forget, so a missed/dismissed
-  // tray notification leaves the app with no other signal that
-  // something's waiting — this listener is that signal.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       const wasBackgrounded = appState.current.match(/inactive|background/);
       const isNowActive = nextAppState === 'active';
 
       if (wasBackgrounded && isNowActive && currentUser && currentScreen !== 'splash' && currentScreen !== 'login') {
-        refreshPendingAlerts(); // updates badge/inline cards only — no forced tab switch
+        refreshPendingAlerts();
       }
 
       appState.current = nextAppState;
@@ -136,28 +121,26 @@ export default function App() {
     return () => subscription.remove();
   }, [currentUser, currentScreen, refreshPendingAlerts]);
 
-  const goToHome = (userData) => {
+  const goToHome = useCallback((userData) => {
     setCurrentUser(userData);
     setCurrentScreen('home');
     refreshPendingAlerts();
-  };
+  }, [refreshPendingAlerts]);
 
-  const goToAlerts = (alerts) => {
+  const goToAlerts = useCallback((alerts) => {
     if (alerts) setPendingAlerts(alerts);
     setCurrentScreen('alerts');
-  };
-  const goToMessages = () => setCurrentScreen('messages');
+  }, []);
 
-  const goToThread = (visitorId) => {
+  const goToMessages = useCallback(() => setCurrentScreen('messages'), []);
+
+  const goToThread = useCallback((visitorId) => {
     setMessageThreadId(visitorId);
     setCurrentScreen('messageThread');
-  };
+  }, []);
 
-  const handleAlertResolved = (sessionId, response, result) => {
+  const handleAlertResolved = useCallback((sessionId, response, result) => {
     if (response === 'wait') {
-      // Per backend docs: "Wait" does not remove the alert — the host
-      // may still want to see/act on it if they finish early. Update
-      // the item in place instead of filtering it out.
       setPendingAlerts((prev) =>
         prev.map((a) =>
           a.session_id === sessionId
@@ -167,16 +150,14 @@ export default function App() {
       );
       return;
     }
-
-    // "available" or "not_available" — alert is resolved, remove it.
     setPendingAlerts((prev) => prev.filter((a) => a.session_id !== sessionId));
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setCurrentUser(null);
     setPendingAlerts([]);
     setCurrentScreen('login');
-  };
+  }, []);
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -191,6 +172,9 @@ export default function App() {
             goToLogin={logout}
             goToAlerts={goToAlerts}
             goToMessages={goToMessages}
+            pending={pendingAlerts}
+            onAlertResolved={handleAlertResolved}
+            onRefresh={refreshPendingAlerts}
           />
         );
       case 'messages':
@@ -273,7 +257,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#334155',
     paddingTop: 8,
-    paddingBottom: 24, // safe-area padding for home indicator
+    paddingBottom: 24,
   },
   tabItem: {
     flex: 1,
