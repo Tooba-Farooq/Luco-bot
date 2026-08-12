@@ -115,19 +115,20 @@ public class DeviceCheck : MonoBehaviour
     }
 
     private void StartMicrophone()
+{
+    if (Microphone.devices.Length > 0)
     {
-        if (Microphone.devices.Length > 0)
-        {
-            micDevice = Microphone.devices[0];
-            AudioClip clip = Microphone.Start(micDevice, true, 10, 44100);
-
-            Debug.Log("Mic started: " + (clip != null));
-        }
-        else
-        {
-            Debug.LogWarning("No microphone devices found.");
-        }
+        micDevice = Microphone.devices[0];
+        Debug.Log("Microphone available: " + micDevice);
+        // Actual recording is owned by AudioRecorder — don't start a
+        // session here. Microphone.Start() locks the device, which
+        // blocks AudioRecorder.StartRecording() from working later.
     }
+    else
+    {
+        Debug.LogWarning("No microphone devices found.");
+    }
+}
 
     private IEnumerator ReturnToIdleAfterDelay(float seconds)
     {
