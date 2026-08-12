@@ -9342,46 +9342,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 565523759}
     m_Modifications:
-    - target: {fileID: 709593093035876642, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_Color.b
-      value: 0.65882355
-      objectReference: {fileID: 0}
-    - target: {fileID: 709593093035876642, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_Color.g
-      value: 0.8509804
-      objectReference: {fileID: 0}
-    - target: {fileID: 709593093035876642, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_Color.r
-      value: 0.12156863
-      objectReference: {fileID: 0}
-    - target: {fileID: 1553246055262382918, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontSize
-      value: 28
-      objectReference: {fileID: 0}
-    - target: {fileID: 1553246055262382918, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontStyle
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1553246055262382918, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontColor.b
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1553246055262382918, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontColor.g
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1553246055262382918, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontColor.r
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1553246055262382918, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontSizeBase
-      value: 28
-      objectReference: {fileID: 0}
-    - target: {fileID: 1553246055262382918, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontColor32.rgba
-      value: 4294967295
-      objectReference: {fileID: 0}
     - target: {fileID: 2084498736715809530, guid: b628827d7682d6f488fa47854253cad5, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -9461,34 +9421,6 @@ PrefabInstance:
     - target: {fileID: 2084498736715809530, guid: b628827d7682d6f488fa47854253cad5, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2706145869596912951, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontSize
-      value: 28
-      objectReference: {fileID: 0}
-    - target: {fileID: 2706145869596912951, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontStyle
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2706145869596912951, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontColor.b
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2706145869596912951, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontColor.g
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2706145869596912951, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontColor.r
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2706145869596912951, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontSizeBase
-      value: 28
-      objectReference: {fileID: 0}
-    - target: {fileID: 2706145869596912951, guid: b628827d7682d6f488fa47854253cad5, type: 3}
-      propertyPath: m_fontColor32.rgba
-      value: 4294967295
       objectReference: {fileID: 0}
     - target: {fileID: 4733807716027141639, guid: b628827d7682d6f488fa47854253cad5, type: 3}
       propertyPath: m_AnchorMax.y
@@ -15369,7 +15301,7 @@ MonoBehaviour:
   flowManager: {fileID: 2089889922}
   face: {fileID: 1902588907}
   staticQRFallback: {fileID: 2800000, guid: 2faf7364ae40bd549b200e2dd1c2ded9, type: 3}
-  displayDuration: 30
+  displayDuration: 8
 --- !u!114 &1432402602
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16176,15 +16108,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AudioRecorder
   sampleRate: 16000
-  silenceThreshold: 0.003
+  silenceThreshold: 0.02
   silenceDurationToStop: 1.5
-  maxRecordingLength: 5
+  maxRecordingLength: 15
   minRecordingLength: 0.5
   calibrationDuration: 0.3
   noiseFloorMultiplier: 2
   maxAllowedNoiseFloor: 0.008
   preferredMicDevice: 
-  logVolumeForCalibration: 1
+  logVolumeForCalibration: 0
   volumeHistorySize: 9
 --- !u!4 &1514361374
 Transform:

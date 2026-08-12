@@ -20,7 +20,7 @@ public class FaceDetectionService : MonoBehaviour
 {
     [Header("Backend")]
     // FIXED: Corrected double colon typo "::8000" to ":8000"
-    public string baseUrl = "http://192.168.100.141:8000"; 
+    public string baseUrl = "https://snub-tactics-impatient.ngrok-free.dev"; 
 
     [Header("References")]
     public WebCamTexture webcamTexture;

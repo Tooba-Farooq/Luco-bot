@@ -349,7 +349,7 @@ public class FaceExpressionController : MonoBehaviour
                 break;
 
             case FaceExpression.Purpose:
-                yield return HeadTilt();
+                //yield return HeadTilt();
                 break;
 
             case FaceExpression.Confused:

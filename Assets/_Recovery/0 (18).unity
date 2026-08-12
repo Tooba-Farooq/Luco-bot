@@ -9896,7 +9896,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -350, y: 0}
+  m_AnchoredPosition: {x: -349.99994, y: 0}
   m_SizeDelta: {x: -700, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &927063250
@@ -15369,7 +15369,7 @@ MonoBehaviour:
   flowManager: {fileID: 2089889922}
   face: {fileID: 1902588907}
   staticQRFallback: {fileID: 2800000, guid: 2faf7364ae40bd549b200e2dd1c2ded9, type: 3}
-  displayDuration: 30
+  displayDuration: 8
 --- !u!114 &1432402602
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16176,15 +16176,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AudioRecorder
   sampleRate: 16000
-  silenceThreshold: 0.003
+  silenceThreshold: 0.005
   silenceDurationToStop: 1.5
-  maxRecordingLength: 5
+  maxRecordingLength: 15
   minRecordingLength: 0.5
   calibrationDuration: 0.3
   noiseFloorMultiplier: 2
   maxAllowedNoiseFloor: 0.008
   preferredMicDevice: 
-  logVolumeForCalibration: 1
+  logVolumeForCalibration: 0
   volumeHistorySize: 9
 --- !u!4 &1514361374
 Transform:

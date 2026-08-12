@@ -21,8 +21,8 @@ public class QRCodeScreen : MonoBehaviour
         string spokenMessage = $"I am notifying {hostName}. Please scan this code — further updates will be sent to your phone.";
         messageText.text = spokenMessage;
 
-        if (AndroidTTS.Instance != null)
-            AndroidTTS.Instance.Speak(spokenMessage);
+        // TTS removed — backend already plays its own audio prompt for this screen.
+        // Keeping messageText.text so the on-screen caption still matches what's said.
 
         if (face != null)
             face.SetExpression(FaceExpression.Success);
@@ -40,8 +40,8 @@ public class QRCodeScreen : MonoBehaviour
             qrImage.texture = staticQRFallback;
         }
 
-        StartCoroutine(ReturnToIdleAfterDelay());
-    }
+    StartCoroutine(ReturnToIdleAfterDelay());
+}
 
     private Texture2D DecodeBase64ToTexture(string base64)
     {
