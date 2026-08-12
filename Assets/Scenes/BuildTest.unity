@@ -16947,6 +16947,7 @@ MonoBehaviour:
   cameraPreview: {fileID: 24078256}
   promptText: {fileID: 579785049}
   retryText: {fileID: 756527574}
+  flashOverlay: {fileID: 0}
   boundaryOutline: {fileID: 476583616}
   detectedColor: {r: 0, g: 1, b: 0, a: 1}
   undetectedColor: {r: 1, g: 0, b: 0, a: 1}
@@ -16954,7 +16955,6 @@ MonoBehaviour:
   flowManager: {fileID: 2089889922}
   face: {fileID: 1902588907}
   detectionService: {fileID: 1214131311}
-  lookAtCameraClip: {fileID: 8300000, guid: 85d342789b02a0a45a647291fd0a2c31, type: 3}
   pollInterval: 0.3
 --- !u!1 &1622192065
 GameObject:

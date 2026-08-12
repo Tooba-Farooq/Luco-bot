@@ -21,9 +21,6 @@ public class CapturePhotoScreen : MonoBehaviour
     public FaceExpressionController face;
     public FaceDetectionService detectionService;
 
-    [Header("Audio")]
-    public AudioClip lookAtCameraClip;
-
     [Header("Polling")]
     public float pollInterval = 0.3f;
 
@@ -43,11 +40,6 @@ public class CapturePhotoScreen : MonoBehaviour
         if (RobotCaptionController.Instance != null)
         {
             RobotCaptionController.Instance.SetSuppressed(true);
-        }
-
-        if (face != null && lookAtCameraClip != null)
-        {
-            face.StartTalking(lookAtCameraClip);
         }
 
         ResetScreen();
@@ -509,30 +501,28 @@ public class CapturePhotoScreen : MonoBehaviour
             // 409
             // =================================================
 
-            else if (
-                request.responseCode == 409
-            )
-            {
-                Debug.LogWarning(
-                    "[CapturePhotoScreen] " +
-                    "capture-photo rejected (409): " +
-                    request.downloadHandler.text
-                );
+            else if (request.responseCode == 409)
+{
+    Debug.LogWarning(
+        "[CapturePhotoScreen] " +
+        "capture-photo rejected (409): " +
+        request.downloadHandler.text
+    );
 
-                if (retryText != null)
-                {
-                    retryText.SetActive(true);
-                }
+    if (retryText != null)
+    {
+        retryText.SetActive(true);
+    }
 
-                if (promptText != null)
-                {
-                    promptText.SetActive(true);
-                }
+    if (promptText != null)
+    {
+        promptText.SetActive(false);
+    }
 
-                captureInFlight = false;
+    captureInFlight = false;
 
-                StartPolling();
-            }
+    StartPolling();
+}
 
             // =================================================
             // OTHER ERROR
