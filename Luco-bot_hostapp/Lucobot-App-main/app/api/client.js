@@ -194,3 +194,28 @@ export async function respondToAlert(sessionId, response, waitMinutes) {
 export async function logout() {
   await clearTokens();
 }
+
+export async function updateFloorRoom(floorRoom) {
+  const res = await authFetch(`${BASE_URL}/host/profile/floor-room`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ floor_room: floorRoom }),
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || 'Failed to update floor/room');
+  }
+
+  return res.json();
+}
+
+export async function getAlertHistory({ limit = 20, offset = 0 } = {}) {
+  const response = await authFetch(`${BASE_URL}/host/alert-history?limit=${limit}&offset=${offset}`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch alert history');
+  }
+
+  return response.json();
+}

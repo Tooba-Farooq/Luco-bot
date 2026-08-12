@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { respondToAlert } from "../api/client";
 
 function parseUTC(isoString) {
@@ -66,11 +67,11 @@ export default function AlertScreen({ alerts, onResolved, goToHome, goToMessages
     const isNew = waitedMin < 1;
 
     return (
-      <View
-        style={[
-          styles.card,
-          urgency === "urgent" && styles.cardUrgent,
-        ]}
+      <LinearGradient
+        colors={["#1e293b", "#16233b"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.card, urgency === "urgent" && styles.cardUrgent]}
       >
         {isNew && (
           <View style={styles.newBadge}>
@@ -79,20 +80,17 @@ export default function AlertScreen({ alerts, onResolved, goToHome, goToMessages
         )}
 
         {item.visitor_photo_url ? (
-  <Image
-    source={{
-      uri: item.visitor_photo_url,
-      headers: { 'ngrok-skip-browser-warning': 'true' },
-    }}
-    style={styles.photo}
-  />
-) : (
-  <View style={styles.photoPlaceholder}>
-    <Text style={styles.photoInitial}>
-      {item.visitor_name?.charAt(0)?.toUpperCase() || "?"}
-    </Text>
-  </View>
-)}
+          <Image
+            source={{ uri: item.visitor_photo_url, headers: { "ngrok-skip-browser-warning": "true" } }}
+            style={styles.photo}
+          />
+        ) : (
+          <View style={styles.photoPlaceholder}>
+            <Text style={styles.photoInitial}>
+              {item.visitor_name?.charAt(0)?.toUpperCase() || "?"}
+            </Text>
+          </View>
+        )}
 
         <Text style={styles.name}>{item.visitor_name}</Text>
         <Text style={styles.purpose}>{item.purpose}</Text>
@@ -129,30 +127,30 @@ export default function AlertScreen({ alerts, onResolved, goToHome, goToMessages
         {submitting === item.session_id ? (
           <ActivityIndicator style={{ marginTop: 16 }} color="#00bcd4" />
         ) : (
-          <View style={styles.buttonRow}>
+          <View style={styles.buttonStack}>
             <TouchableOpacity
-              style={[styles.button, styles.availableButton]}
+              style={[styles.buttonFull, styles.availableButton]}
               onPress={() => handleRespond(item.session_id, "available")}
             >
               <Text style={styles.buttonText}>Send In</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.button, styles.waitButton]}
+              style={[styles.buttonFull, styles.waitButton]}
               onPress={() => setWaitModalFor(item.session_id)}
             >
               <Text style={styles.buttonText}>Wait</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.button, styles.notAvailableButton]}
+              style={[styles.buttonFull, styles.notAvailableButton]}
               onPress={() => handleRespond(item.session_id, "not_available")}
             >
               <Text style={styles.buttonText}>Not Available</Text>
             </TouchableOpacity>
           </View>
         )}
-      </View>
+      </LinearGradient>
     );
   };
 
@@ -225,13 +223,17 @@ const styles = StyleSheet.create({
   headerSubtitle: { fontSize: 13, color: "#64748b", marginTop: 2 },
   empty: { color: "#64748b", fontSize: 14, textAlign: "center", marginTop: 40 },
   card: {
-    backgroundColor: "#1e293b",
-    borderRadius: 12,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 16,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "transparent",
+    borderColor: "rgba(148, 163, 184, 0.1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
   },
   cardUrgent: {
     borderColor: "#dc2626",
@@ -272,34 +274,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     backgroundColor: "#334155",
   },
-  waitPillWarning: {
-    backgroundColor: "#713f12",
-  },
-  waitPillUrgent: {
-    backgroundColor: "#7f1d1d",
-  },
-  waitPillText: {
-    fontSize: 11,
-    color: "#94a3b8",
-    fontWeight: "600",
-  },
-  waitPillTextWarning: {
-    color: "#fbbf24",
-  },
-  waitPillTextUrgent: {
-    color: "#fca5a5",
-  },
+  waitPillWarning: { backgroundColor: "#713f12" },
+  waitPillUrgent: { backgroundColor: "#7f1d1d" },
+  waitPillText: { fontSize: 11, color: "#94a3b8", fontWeight: "600" },
+  waitPillTextWarning: { color: "#fbbf24" },
+  waitPillTextUrgent: { color: "#fca5a5" },
   waitBadge: { fontSize: 12, color: "#fbbf24", marginTop: 8 },
-  buttonRow: { flexDirection: "row", marginTop: 16, gap: 8 },
-  button: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
+
+  buttonStack: { width: "100%", marginTop: 16, gap: 8 },
+  buttonFull: { paddingVertical: 12, borderRadius: 10, alignItems: "center", width: "100%" },
   availableButton: { backgroundColor: "#16a34a" },
-  waitButton: { backgroundColor: "#ca8a04" },
-  notAvailableButton: { backgroundColor: "#dc2626" },
-  buttonText: { color: "#fff", fontWeight: "600", fontSize: 13 },
+  waitButton: { backgroundColor: "#334155", borderWidth: 1, borderColor: "#475569" },
+  notAvailableButton: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#dc2626" },
+  buttonText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+
   homeButton: { marginTop: 8, alignItems: "center", padding: 12 },
   homeButtonText: { color: "#94a3b8", textDecorationLine: "underline" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
-  modalBox: { backgroundColor: "#1e293b", borderRadius: 12, padding: 24, width: "80%" },
+  modalBox: { backgroundColor: "#1e293b", borderRadius: 16, padding: 24, width: "80%" },
   modalTitle: { color: "#fff", fontSize: 16, fontWeight: "600", marginBottom: 16, textAlign: "center" },
   modalOption: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#334155" },
   modalOptionText: { color: "#00bcd4", fontSize: 15, textAlign: "center" },
