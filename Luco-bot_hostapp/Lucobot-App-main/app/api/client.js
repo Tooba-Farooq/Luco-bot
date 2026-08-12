@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
-const BASE_URL = "https://take-awaken-cactus.ngrok-free.dev";
+const BASE_URL = "https://snub-tactics-impatient.ngrok-free.dev";
 
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';

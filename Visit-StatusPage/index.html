@@ -257,7 +257,7 @@
 
     const HTTP_BASE = window.location.hostname === "localhost"
       ? "http://localhost:8000"
-      : "https://snub-tactics-impatient.ngrok-free.dev";
+      : "https://snub-tactics-impatient.ngrok-free.dev/";
 
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
@@ -366,14 +366,14 @@
     });
 
     // Sending message
-      sendMessageBtn.addEventListener("click", async () => {
-  if (!token) {
-    recordStatus.textContent = "Missing status token.";
-    return;
-  }
+    sendMessageBtn.addEventListener("click", async () => {
+      if (!token) {
+        recordStatus.textContent = "Missing status token.";
+        return;
+      }
 
-  const formData = new FormData();
-  formData.append("status_token", token);
+      const formData = new FormData();
+      formData.append("status_token", token);
 
       if (mode === "type") {
         const text = messageText.value.trim();
@@ -419,55 +419,94 @@
       }
     });
 
-    // WebSocket Connection handling
+    // WebSocket connection handling
     if (!token) {
       showBanner("Missing or invalid status token.", "error");
     } else {
+      let currentWS = null;
+      let reconnectTimer = null;
+      let pingInterval = null;
+
+      function stopPing() {
+        if (pingInterval) {
+          clearInterval(pingInterval);
+          pingInterval = null;
+        }
+      }
+
+      function startPing(ws) {
+        stopPing();
+        // Keeps the connection active through proxy/ngrok idle timeouts.
+        // Server already accepts arbitrary text in its receive loop, so no
+        // backend change is needed to support this.
+        pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send("ping");
+          }
+        }, 20000);
+      }
+
       function connectWS() {
+        // Avoid opening a duplicate connection if one is already live or connecting
+        if (currentWS && (currentWS.readyState === WebSocket.OPEN || currentWS.readyState === WebSocket.CONNECTING)) {
+          return;
+        }
+
         const ws = new WebSocket(`${API_BASE}/ws/status/${token}`);
+        currentWS = ws;
 
         ws.onopen = () => {
           connectingEl.innerHTML = '<span class="pulse-dot"></span><span>Waiting for updates...</span>';
+          startPing(ws);
         };
 
-       ws.onmessage = (event) => {
-    try {
-        const data = JSON.parse(event.data);
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
 
-        console.log("Received WebSocket data:", data);
-        console.log("session_id =", data.session_id);
+            if (data.host_response === null || data.host_response === undefined) {
+              const who = data.host_name || "your host";
+              bannerEl.style.display = "none";
+              connectingEl.style.display = "flex";
+              connectingEl.innerHTML = `<span class="pulse-dot"></span><span>Waiting for ${who} to respond...</span>`;
+              return;
+            }
 
-        if (data.host_response === null || data.host_response === undefined) {
-            const who = data.host_name || "your host";
-            bannerEl.style.display = "none";
-            connectingEl.style.display = "flex";
-            connectingEl.innerHTML = `<span class="pulse-dot"></span><span>Waiting for ${who} to respond...</span>`;
-            return;
-        }
+            const message = data.visitor_message || "Waiting for your host to respond...";
+            showBanner(message, stateToClass(data.state));
+            updateMessagePanelVisibility(data.state);
 
-        const message = data.visitor_message || "Waiting for your host to respond...";
-        showBanner(message, stateToClass(data.state));
-        updateMessagePanelVisibility(data.state);
-
-    } catch (err) {
-        console.error("Failed to parse status message:", err);
-        showBanner("Received an unexpected update.", "error");
-    }
-};
+          } catch (err) {
+            console.error("Failed to parse status message:", err);
+            showBanner("Received an unexpected update.", "error");
+          }
+        };
 
         ws.onerror = () => {
           showBanner("Connection error. Reconnecting...", "error");
         };
 
         ws.onclose = (event) => {
+          stopPing();
           if (event.code === 4404) {
             showBanner("This visit link is invalid or has expired.", "error");
-          } else {
-            // Reconnect attempt after delay
-            setTimeout(connectWS, 3000);
+            return;
           }
+          clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(connectWS, 3000);
         };
       }
+
+      // Force a reconnect check whenever the tab/app comes back to the
+      // foreground — covers phone lock, app switch, or browser-throttled
+      // background timers that could otherwise delay reconnection indefinitely.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          connectWS();
+        }
+      });
+      window.addEventListener("pageshow", () => connectWS());
+      window.addEventListener("online", () => connectWS());
 
       connectWS();
     }
