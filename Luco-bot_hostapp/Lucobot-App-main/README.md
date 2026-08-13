@@ -1,6 +1,3 @@
-Here's the updated README, in chat, reflecting everything built and fixed this session:
-
----
 
 # Host App — README (Deliverables 1 & 3 + Push Notifications)
 
