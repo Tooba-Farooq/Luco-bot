@@ -1,25 +1,25 @@
-import sqlite3
+import json
 from app.database import SessionLocal
-from app.models_db import Employee, Visitor, VisitLog, VisitSession
+from app.models_db import Visitor
 
-sqlite_conn = sqlite3.connect("lucobot.db")
-sqlite_conn.row_factory = sqlite3.Row
+db = SessionLocal()
 
-neon_db = SessionLocal()  # this now points at Neon, since DATABASE_URL was updated
+visitors = db.query(Visitor).filter(Visitor.face_embedding.isnot(None)).all()
+fixed = 0
 
-def migrate_table(table_name, model_class):
-    rows = sqlite_conn.execute(f"SELECT * FROM {table_name}").fetchall()
-    for row in rows:
-        record = model_class(**dict(row))
-        neon_db.merge(record)  # merge instead of add, so re-running this script is safe
-    neon_db.commit()
-    print(f"Migrated {len(rows)} rows from {table_name}")
+for v in visitors:
+    if isinstance(v.face_embedding, str):
+        try:
+            parsed = json.loads(v.face_embedding)
+            if isinstance(parsed, list) and len(parsed) > 0:
+                v.face_embedding = parsed
+                fixed += 1
+                print(f"Fixed visitor_id={v.id} name={v.name!r} — {len(parsed)} dims")
+            else:
+                print(f"visitor_id={v.id} name={v.name!r} — parsed but not a valid list, skipping")
+        except (json.JSONDecodeError, TypeError) as e:
+            print(f"visitor_id={v.id} name={v.name!r} — could not parse: {e}")
 
-migrate_table("employees", Employee)
-migrate_table("visitors", Visitor)
-migrate_table("visit_logs", VisitLog)
-migrate_table("visit_sessions", VisitSession)
-
-sqlite_conn.close()
-neon_db.close()
-print("Done.")
+db.commit()
+db.close()
+print(f"\nDone. Fixed {fixed} visitor(s).")

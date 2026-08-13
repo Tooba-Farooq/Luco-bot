@@ -146,8 +146,10 @@ def run_face_recognition(image, db: Session):
 
     best_person, best_sim = None, float("-inf")
 
+    print(f"--- comparing against {len(known_people)} known visitor(s) ---")
     for person in known_people:
         sim = _cosine_similarity(incoming_embedding, person.face_embedding)
+        print(f"  visitor_id={person.id} name={person.name!r} sim={sim:.4f}")
         if sim > best_sim:
             best_sim = sim
             best_person = person
