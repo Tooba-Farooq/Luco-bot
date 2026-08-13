@@ -11,7 +11,7 @@ configuration = sib_api_v3_sdk.Configuration()
 configuration.api_key['api-key'] = BREVO_API_KEY
 
 
-def send_invite_email(to_email: str, employee_name: str, invite_token: str) -> bool:
+def send_invite_email(to_email: str, employee_name: str, invite_token: str, employee_code: str) -> bool:
     if not to_email:
         print("[email_service] No email on file for this employee — skipping invite email.")
         return False
@@ -28,6 +28,7 @@ def send_invite_email(to_email: str, employee_name: str, invite_token: str) -> b
             <p>Hi {employee_name},</p>
             <p>You've been added to Lucobot. Click below to set your password and activate your account:</p>
             <p><a href="{activation_link}">Activate your account</a></p>
+            <p>Your employee ID (used to log in) is: <strong>{employee_code}</strong></p>
             <p>This link expires in 7 days.</p>
         """,
     )

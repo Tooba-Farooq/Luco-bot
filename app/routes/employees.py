@@ -49,7 +49,7 @@ async def create_employee(
 
     if employee.email and employee.invite_token:
         background_tasks.add_task(
-            send_invite_email, employee.email, employee.name, employee.invite_token
+            send_invite_email, employee.email, employee.name, employee.invite_token, employee.employee_code
         )
 
     return _to_employee_response(employee)

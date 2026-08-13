@@ -20,11 +20,14 @@ class ConnectionManager:
     async def send_update(self, status_token: str, payload: dict):
         websocket = self._connections.get(status_token)
         if websocket is None:
+            print(f"[connection_manager] No live connection for {status_token} — push dropped")
             return False
         try:
             await websocket.send_json(payload)
+            print(f"[connection_manager] Push delivered to {status_token}")
             return True
-        except Exception:
+        except Exception as e:
+            print(f"[connection_manager] Push failed for {status_token}: {e}")
             self.disconnect(status_token, websocket)
             return False
 

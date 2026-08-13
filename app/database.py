@@ -1,7 +1,11 @@
+import os
 from sqlalchemy import create_engine, MetaData, Column, Integer, String, DateTime, Boolean, ForeignKey, Text, JSON
 from sqlalchemy.orm import sessionmaker, declarative_base
+from dotenv import load_dotenv
 
-DATABASE_URL = "sqlite:///./lucobot.db"
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 naming_convention = {
     "ix": "ix_%(column_0_label)s",
@@ -11,8 +15,7 @@ naming_convention = {
     "pk": "pk_%(table_name)s",
 }
 
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 metadata = MetaData(naming_convention=naming_convention)
 Base = declarative_base(metadata=metadata)
@@ -24,5 +27,3 @@ def get_db():
         yield db
     finally:
         db.close()
-
-

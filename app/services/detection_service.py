@@ -5,9 +5,9 @@ from mediapipe.tasks.python import vision
 from mediapipe.tasks.python import vision as mp_vision
 import numpy as np
 import math
-from deepface import DeepFace
 from sqlalchemy.orm import Session
 from app.models_db import Employee, Visitor
+from app.services.embedding_service import get_embedding_from_array
 
 
 # --- Face presence detector (cheap, runs every frame) ---
@@ -24,15 +24,22 @@ landmarker_options = mp_vision.FaceLandmarkerOptions(
 )
 face_landmarker = mp_vision.FaceLandmarker.create_from_options(landmarker_options)
 
-# --- Recognition config (validated: ArcFace + yunet, see benchmark results) ---
-FACE_RECOGNITION_MODEL = "ArcFace"
-FACE_DETECTOR_BACKEND = "yunet"  # DeepFace supports multiple backends, but yunet is fastest and works well for our use case
-RECOGNITION_THRESHOLD = 0.68  # recalibrated: same-person distances topped out ~0.36,
-                              # different-person distances started ~0.499 — 0.42 sits
-                              # in that gap rather than at its edge
-MIN_MARGIN = 0.08  # best match must beat the second-best match by at least this much,
-                   # or we treat it as ambiguous (e.g. Furqan being close to both
-                   # you and your sister) rather than confidently accepting the top hit
+# --- Recognition config (validated: InsightFace buffalo_l, see benchmark +
+# calculate_distance.py results — clean 0.35 margin between lowest
+# genuine similarity (0.690) and highest impostor similarity (0.340) on
+# internal test set; 0.515 midpoint chosen for zero-false-accept priority) ---
+RECOGNITION_THRESHOLD = 0.515  # NOTE: similarity now, not distance — higher = more
+                               # similar. Comparison direction is opposite of the
+                               # old DeepFace/ArcFace distance-based threshold.
+
+# MIN_MARGIN / ambiguous-match rejection intentionally removed (was here in the
+# DeepFace setup). Deliberate tradeoff: a known visitor that once got misclassified
+# as unknown (duplicate Visitor row) would otherwise stay stuck failing the margin
+# check against their own duplicate forever. RECOGNITION_THRESHOLD (0.515, validated
+# with a clean 0.35 similarity gap between genuine/impostor pairs) is relied on as
+# the sole gate now. Revisit if real-world false accepts between distinct people
+# turn out to be non-negligible — see calculate_distance.py for how this
+# was calibrated.
 
 
 def _load_image(image_bytes_or_path):
@@ -93,9 +100,11 @@ def check_face_forward(image, face_box, debug: bool = False) -> bool:
     return abs(yaw_deg) < MAX_YAW_DEGREES
 
 
-def _cosine_distance(emb1, emb2):
+def _cosine_similarity(emb1, emb2):
+    """InsightFace's native comparison metric — HIGHER means more similar,
+    opposite direction from the old _cosine_distance (lower = more similar)."""
     a, b = np.array(emb1), np.array(emb2)
-    return 1 - (np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
 
 def _is_valid_embedding(embedding) -> bool:
@@ -110,42 +119,22 @@ def _is_valid_embedding(embedding) -> bool:
 def run_face_recognition(image, db: Session):
     """
     image: decoded numpy array (BGR), already confirmed forward-facing by the poll loop.
-    Generates one embedding for the incoming frame (ArcFace + opencv), then compares
-    it against every stored embedding (employees + known visitors) via cosine distance.
+    Generates one embedding for the incoming frame (InsightFace buffalo_l), then
+    compares it against every stored embedding (known visitors) via cosine similarity.
 
-    Accepts a match only if:
-      1. the best distance clears RECOGNITION_THRESHOLD, AND
-      2. the best distance beats the second-best distance by at least MIN_MARGIN
-         (guards against cases where two different people are both plausibly close,
-         e.g. one visitor's embedding sitting near-equidistant between two enrolled
-         siblings — a single-best-match check can't tell that apart from a confident hit)
+    Accepts a match if the best similarity clears RECOGNITION_THRESHOLD.
+    (No ambiguous-margin check — see note above RECOGNITION_THRESHOLD for why.)
 
-    Returns (visitor_id: int | None, name: str | None).
-    Returns (None, None) if:
-      - opencv couldn't detect/crop a face in this frame (e.g. niqab, mask, bad angle
+    Returns (visitor_id: int | None, name: str | None, confidence: float | None).
+    Returns (None, None, None) if:
+      - no face could be detected/embedded in this frame (e.g. niqab, mask, bad angle
         at the exact recognition instant) — treated as unknown, not an error
       - no stored embedding is within threshold
-      - the top two matches are too close together to trust (ambiguous)
     """
-    try:
-        results = DeepFace.represent(
-            img_path=image,
-            model_name=FACE_RECOGNITION_MODEL,
-            detector_backend=FACE_DETECTOR_BACKEND,
-            enforce_detection=True
-        )
-    except ValueError:
-        print("No face detected by DeepFace/yunet this frame")
+    incoming_embedding = get_embedding_from_array(image)
+    if incoming_embedding is None:
+        print("No face detected by InsightFace this frame")
         return None, None, None
-    except Exception as e:
-        print(f"Recognition embedding failed unexpectedly: {e}")
-        return None, None, None
-
-    largest_face = max(
-        results,
-        key=lambda r: r["facial_area"]["w"] * r["facial_area"]["h"]
-    )
-    incoming_embedding = largest_face["embedding"]
 
     known_people = [
         person
@@ -155,32 +144,22 @@ def run_face_recognition(image, db: Session):
         if _is_valid_embedding(person.face_embedding)
     ]
 
-    best_person, best_dist = None, float("inf")
-    second_best_dist = float("inf")
+    best_person, best_sim = None, float("-inf")
 
     for person in known_people:
-        dist = _cosine_distance(incoming_embedding, person.face_embedding)
-        if dist < best_dist:
-            second_best_dist = best_dist
-            best_dist = dist
+        sim = _cosine_similarity(incoming_embedding, person.face_embedding)
+        if sim > best_sim:
+            best_sim = sim
             best_person = person
-        elif dist < second_best_dist:
-            second_best_dist = dist
 
-    print(f"best={best_person.name if best_person else 'N/A'}, best_dist={best_dist if best_person else 'N/A'}")
-    if best_person is None or best_dist >= RECOGNITION_THRESHOLD:
-        print("Rejected: no match under threshold")
+    print(f"best={best_person.name if best_person else 'N/A'}, best_sim={best_sim if best_person else 'N/A'}")
+    if best_person is None or best_sim < RECOGNITION_THRESHOLD:
+        print("Rejected: no match above threshold")
         return None, None, None
 
-    margin = second_best_dist - best_dist
-    print(f"margin={margin:.4f}")
-    if margin < MIN_MARGIN:
-        print("Rejected: ambiguous margin")
-        return None, None, None
+    return best_person.id, best_person.name, best_sim
 
-    confidence = 1 - best_dist
-    return best_person.id, best_person.name, confidence
-    
+
 def check_face_centered(image, face_box, x_tolerance: float = 0.15, y_tolerance: float = 0.30) -> bool:
     """
     Returns True if the face's center is within tolerance (as a fraction
