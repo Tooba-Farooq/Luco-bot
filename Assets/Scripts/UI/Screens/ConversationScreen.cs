@@ -11,7 +11,12 @@ public class ConversationScreen : MonoBehaviour
     public VisitorFlowManager flowManager;
     public FaceExpressionController face;
 
+    [Header("Silence / Abandonment Handling")]
+    [Tooltip("How many times we retry listening after silence before giving up and going back to idle.")]
+    public int maxSilenceRetries = 1;
+
     private bool isStartingRecording = false;
+    private int silenceRetryCount = 0;
 
     // =========================================================
     // ENABLE
@@ -24,6 +29,7 @@ public class ConversationScreen : MonoBehaviour
         );
 
         isStartingRecording = false;
+        silenceRetryCount = 0;
 
         if (SessionManager.Instance != null)
         {
@@ -76,6 +82,7 @@ public class ConversationScreen : MonoBehaviour
         }
 
         isStartingRecording = false;
+        silenceRetryCount = 0;
 
         if (captionBar != null)
             captionBar.HideListening();
@@ -138,6 +145,10 @@ public class ConversationScreen : MonoBehaviour
         {
             return;
         }
+
+        // Got a real response from the backend — visitor is still there.
+        // Reset the abandonment counter.
+        silenceRetryCount = 0;
 
         Debug.Log(
             $"[ConversationScreen] " +
@@ -306,7 +317,7 @@ public class ConversationScreen : MonoBehaviour
     }
 
     // =========================================================
-    // RECORDING FAILED
+    // RECORDING FAILED (SILENCE / NO SPEECH DETECTED)
     // =========================================================
 
     private void HandleRecordingFailed()
@@ -314,9 +325,30 @@ public class ConversationScreen : MonoBehaviour
         if (!isActiveAndEnabled)
             return;
 
+        silenceRetryCount++;
+
+        if (silenceRetryCount > maxSilenceRetries)
+        {
+            Debug.Log(
+                "[ConversationScreen] " +
+                $"No response after {silenceRetryCount} attempt(s) — " +
+                "assuming visitor left. Returning to idle."
+            );
+
+            if (SessionManager.Instance != null)
+                SessionManager.Instance.EndSession();
+
+            silenceRetryCount = 0;
+
+            if (flowManager != null)
+                flowManager.GoTo(VisitorFlowState.Idle);
+
+            return;
+        }
+
         Debug.LogWarning(
             "[ConversationScreen] " +
-            "Recording failed."
+            $"Recording failed (attempt {silenceRetryCount}/{maxSilenceRetries}) — retrying."
         );
 
         if (heardText != null)

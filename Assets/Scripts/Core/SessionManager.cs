@@ -49,6 +49,16 @@ public class SessionManager : MonoBehaviour
     }
 
     // =========================================================
+    // END SESSION (visitor abandoned / conversation over)
+    // =========================================================
+
+    public void EndSession()
+    {
+        CancelPendingRecording();
+        CurrentSessionId = null;
+    }
+
+    // =========================================================
     // RECORDING
     // =========================================================
 
@@ -103,6 +113,11 @@ public class SessionManager : MonoBehaviour
     }
 
     listeningIndicatorActive = true;
+
+    if (cueAudioSource != null && readyToSpeakChime != null)
+    {
+        cueAudioSource.PlayOneShot(readyToSpeakChime);
+    }
 
     OnReadyToSpeak?.Invoke();
 
@@ -499,4 +514,3 @@ public class SessionManager : MonoBehaviour
         }
     }
 }
-

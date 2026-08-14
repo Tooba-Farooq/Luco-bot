@@ -30,41 +30,42 @@ public class ListeningIndicatorAnimator : MonoBehaviour
     void Update()
     {
         AnimateWaveform();
+        AnimateMicPulse();
     }
 
     void AnimateWaveform()
-{
-    if (waveformBars == null || AudioRecorder.Instance == null) return;
-
-    float[] volumeHistory = AudioRecorder.Instance.GetVolumeHistory();
-    int sampleCount = Mathf.Min(volumeHistory.Length, waveformBars.Length);
-
-    for (int i = 0; i < waveformBars.Length; i++)
     {
-        if (waveformBars[i] == null) continue;
+        if (waveformBars == null || AudioRecorder.Instance == null) return;
 
-        float normalized;
+        float[] volumeHistory = AudioRecorder.Instance.GetVolumeHistory();
+        int sampleCount = Mathf.Min(volumeHistory.Length, waveformBars.Length);
 
-        if (i < sampleCount)
+        // Use the live adaptive threshold instead of the old static field,
+        // so bars scale sensibly whether the room is quiet or noisy right now.
+        float threshold = Mathf.Max(AudioRecorder.Instance.CurrentThreshold, 0.0001f);
+
+        for (int i = 0; i < waveformBars.Length; i++)
         {
-            // scale relative to silence threshold so it reacts sensibly
-            // regardless of the raw volume range
-            normalized = Mathf.Clamp01(
-                volumeHistory[i] / (AudioRecorder.Instance.silenceThreshold * 6f)
-            );
-        }
-        else
-        {
-            normalized = 0f;
-        }
+            if (waveformBars[i] == null) continue;
 
-        float targetHeight = Mathf.Lerp(minBarHeight, maxBarHeight, normalized);
+            float normalized;
 
-        Vector2 size = waveformBars[i].sizeDelta;
-        size.y = Mathf.Lerp(size.y, targetHeight, Time.deltaTime * animationSpeed);
-        waveformBars[i].sizeDelta = size;
+            if (i < sampleCount)
+            {
+                normalized = Mathf.Clamp01(volumeHistory[i] / (threshold * 6f));
+            }
+            else
+            {
+                normalized = 0f;
+            }
+
+            float targetHeight = Mathf.Lerp(minBarHeight, maxBarHeight, normalized);
+
+            Vector2 size = waveformBars[i].sizeDelta;
+            size.y = Mathf.Lerp(size.y, targetHeight, Time.deltaTime * animationSpeed);
+            waveformBars[i].sizeDelta = size;
+        }
     }
-}
 
     void AnimateMicPulse()
     {

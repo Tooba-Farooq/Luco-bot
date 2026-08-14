@@ -69,9 +69,22 @@ public class VisitorFlowManager : MonoBehaviour
                 if (previous ==
                     VisitorFlowState.MeetSomeone_ShowSimilarNames)
                 {
+                    // Successful handoff — give the visitor a moment to read
+                    // the QR code before the camera starts scanning again.
                     StartCoroutine(
                         ResumeDetectionAfterCooldown()
                     );
+                }
+                else if (previous != VisitorFlowState.Idle)
+                {
+                    // Any other exit from the flow (silence timeout, visitor
+                    // walked away mid-conversation, error, etc.) — resume
+                    // detection immediately, no need for a cooldown here.
+                    if (detectionHandler != null)
+                        detectionHandler.ResetDetectionState();
+
+                    if (detectionService != null)
+                        detectionService.StartPolling();
                 }
 
                 break;

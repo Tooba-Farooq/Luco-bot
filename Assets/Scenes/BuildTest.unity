@@ -16176,13 +16176,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AudioRecorder
   sampleRate: 16000
-  silenceThreshold: 0.004
-  silenceDurationToStop: 1.5
+  silenceDurationToStop: 1.4
   maxRecordingLength: 20
   minRecordingLength: 0.5
-  calibrationDuration: 0.5
   noiseFloorMultiplier: 2.5
-  maxAllowedNoiseFloor: 0.0015
+  minAbsoluteThreshold: 0.004
+  maxAbsoluteThreshold: 0.05
+  speechStartDebounceWindows: 2
+  calibrationDuration: 0.5
+  continuousRecalibration: 1
+  rollingNoiseFloorWindowCount: 20
   preferredMicDevice: 
   logVolumeForCalibration: 1
   volumeHistorySize: 9
