@@ -196,7 +196,7 @@ public class CapturePhotoScreen : MonoBehaviour
             UnityWebRequest request =
                 UnityWebRequest.Post(url, form)
         )
-        {
+        {   request.certificateHandler = new BypassCertificate();
             yield return request.SendWebRequest();
 
             // Screen may have changed while request was running.
@@ -383,7 +383,7 @@ public class CapturePhotoScreen : MonoBehaviour
             UnityWebRequest request =
                 UnityWebRequest.Post(url, form)
         )
-        {
+        {   request.certificateHandler = new BypassCertificate();
             yield return request.SendWebRequest();
 
             // Screen changed while request was running.

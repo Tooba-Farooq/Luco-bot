@@ -135,7 +135,7 @@ public class VisitorDetectionHandler : MonoBehaviour
 
         string url = $"{detectionService.baseUrl}/audio/{key}";
         using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.MPEG))
-        {
+        {   www.certificateHandler = new BypassCertificate();
             yield return www.SendWebRequest();
 
             if (www.result == UnityWebRequest.Result.Success)

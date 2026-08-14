@@ -158,7 +158,7 @@ public class SessionManager : MonoBehaviour
                UnityWebRequest.Post(
                    $"{detectionService.baseUrl}/session/respond",
                    form))
-        {
+        {   www.certificateHandler = new BypassCertificate();
             yield return www.SendWebRequest();
 
             activeSendRoutine = null;
@@ -316,7 +316,7 @@ public class SessionManager : MonoBehaviour
                UnityWebRequestMultimedia.GetAudioClip(
                    url,
                    AudioType.MPEG))
-        {
+        {   www.certificateHandler = new BypassCertificate();   // ADD THIS LINE
             yield return www.SendWebRequest();
 
             if (www.result ==
@@ -453,7 +453,7 @@ public class SessionManager : MonoBehaviour
                 "Content-Type",
                 "application/json"
             );
-
+             www.certificateHandler = new BypassCertificate();   // ADD THIS LINE
             yield return www.SendWebRequest();
 
             if (www.result ==

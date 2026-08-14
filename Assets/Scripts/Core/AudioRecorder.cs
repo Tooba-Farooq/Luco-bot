@@ -10,16 +10,16 @@ public class AudioRecorder : MonoBehaviour
     [Header("Recording Settings")]
     public int sampleRate = 16000; // Whisper prefers 16kHz
     [Tooltip("Lower default threshold (0.005) allows quiet speech in quiet rooms to register easily.")]
-    public float silenceThreshold = 0.005f; 
-    public float silenceDurationToStop = 1.5f;
-    public float maxRecordingLength = 5f;
+    public float silenceThreshold = 0.008f; 
+    public float silenceDurationToStop = 1.4f;
+    public float maxRecordingLength = 20f;
     public float minRecordingLength = 0.5f;
 
     [Header("Noise Calibration")]
-    public float calibrationDuration = 0.3f;
-    public float noiseFloorMultiplier = 2.0f;
+    public float calibrationDuration = 0.5f;
+    public float noiseFloorMultiplier = 2.5f;
     [Tooltip("Prevents early speech during calibration from blowing up the noise floor.")]
-    public float maxAllowedNoiseFloor = 0.008f; 
+    public float maxAllowedNoiseFloor = 0.0015f; 
 
     [Header("Device Selection")]
     [Tooltip("Leave blank to use system default microphone (Microphone.devices[0]).")]

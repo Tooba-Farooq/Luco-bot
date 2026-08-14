@@ -79,7 +79,8 @@ public class FaceDetectionService : MonoBehaviour
         form.AddBinaryData("frame", jpegBytes, "frame.jpg", "image/jpeg");
 
         using (UnityWebRequest request = UnityWebRequest.Post($"{baseUrl}/detect", form))
-        {
+        {   
+            request.certificateHandler = new BypassCertificate();
             yield return request.SendWebRequest();
 
             if (request.result == UnityWebRequest.Result.Success)
