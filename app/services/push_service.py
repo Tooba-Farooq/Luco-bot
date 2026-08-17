@@ -33,3 +33,29 @@ async def send_host_alert(employee: Employee, visitor_name: str, visitor_photo_u
     except Exception as e:
         print(f"[push_service] Failed to send push: {e}")
         return False
+
+
+async def send_wait_reminder(employee: Employee, visitor_name: str, wait_minutes: int, session_id: str):
+    if not employee.device_token:
+        print(f"[push_service] No device_token for employee {employee.id} — cannot send wait reminder.")
+        return False
+
+    message = messaging.Message(
+        notification=messaging.Notification(
+            title="Visitor waiting",
+            body=f"{visitor_name} has been waiting {wait_minutes} minutes. Please resolve their visit.",
+        ),
+        data={
+            "session_id": session_id,
+            "type": "wait_reminder",
+        },
+        token=employee.device_token,
+    )
+
+    try:
+        response = messaging.send(message)
+        print(f"[push_service] Wait reminder sent: {response}")
+        return True
+    except Exception as e:
+        print(f"[push_service] Failed to send wait reminder: {e}")
+        return False

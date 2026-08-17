@@ -52,18 +52,33 @@ async def host_respond(
     if payload.response not in VALID_RESPONSES:
         raise HTTPException(status_code=400, detail="Invalid response value")
 
+    from app.services.wait_reminder_scheduler import schedule_wait_reminder, cancel_wait_reminder
+
     if payload.response == "wait":
         if not payload.wait_minutes or payload.wait_minutes <= 0:
             raise HTTPException(status_code=400, detail="wait_minutes is required and must be positive when response is 'wait'")
         session.wait_until = datetime.now(timezone.utc) + timedelta(minutes=payload.wait_minutes)
+        session.wait_minutes = payload.wait_minutes
+        session.wait_reminder_sent_at = None
         session.available_again_at = None
+        schedule_wait_reminder(session.session_id, session.wait_until)
+
     elif payload.response == "not_available":
         session.wait_until = None
+        session.wait_minutes = None
+        session.wait_reminder_sent_at = None
+        cancel_wait_reminder(session.session_id)
         if payload.available_again_at:
             local_dt = payload.available_again_at.replace(tzinfo=LOCAL_TZ)
             session.available_again_at = local_dt.astimezone(timezone.utc)
         else:
             session.available_again_at = None
+
+    elif payload.response == "available":
+        session.wait_until = None
+        session.wait_minutes = None
+        session.wait_reminder_sent_at = None
+        cancel_wait_reminder(session.session_id)
 
     session.host_response = payload.response
     db.commit()

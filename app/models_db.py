@@ -71,7 +71,9 @@ class VisitSession(Base):  # your existing declarative Base
     # --- host-alert flow ---
     host_alert_sent_at = Column(DateTime, nullable=True)
     host_response = Column(String, nullable=True)       # "available" | "not_available" | "wait" | null
-    wait_until = Column(DateTime, nullable=True)          # <-- add this
+    wait_minutes = Column(Integer, nullable=True)
+    wait_until = Column(DateTime(timezone=True), nullable=True)          # <-- add this
+    wait_reminder_sent_at = Column(DateTime, nullable=True)   # <-- add this: dedupe flag
     available_again_at = Column(DateTime, nullable=True)
     visitor_choice = Column(String, nullable=True)       # "wait" | "message" | "cancel" | null
     message_text = Column(Text, nullable=True)

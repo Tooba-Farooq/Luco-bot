@@ -3,7 +3,7 @@ import os
 import json
 
 client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
-LLM_MODEL = "llama-3.1-8b-instant"
+LLM_MODEL = "openai/gpt-oss-20b"
 
 INTENT_PROMPT = """You are classifying a visitor's response at a reception desk.
 
@@ -34,6 +34,7 @@ async def classify_intent(text: str) -> dict:
         model=LLM_MODEL,
         messages=[{"role": "user", "content": INTENT_PROMPT.format(text=text)}],
         temperature=0.0,
+        reasoning_effort="low",
         response_format={"type": "json_object"}
     )
     result = json.loads(response.choices[0].message.content)
@@ -91,6 +92,7 @@ async def resolve_name(en_text: str, ur_text: str) -> str:
         model=LLM_MODEL,
         messages=[{"role": "user", "content": NAME_RESOLUTION_PROMPT.format(en_text=en_text, ur_text=ur_text)}],
         temperature=0.0,
+        reasoning_effort="low",
         response_format={"type": "json_object"}
     )
     result = json.loads(response.choices[0].message.content)

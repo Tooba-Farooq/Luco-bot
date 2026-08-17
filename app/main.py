@@ -13,6 +13,8 @@ from contextlib import asynccontextmanager
 from app.services.tts_service import build_static_audio_cache
 from app import models_db  # ensures models are registered before create_all runs
 from fastapi.staticfiles import StaticFiles
+from app.services.wait_reminder_scheduler import start_scheduler, stop_scheduler
+from app.services.wait_reminder_scheduler import start_scheduler, stop_scheduler, reconcile_pending_wait_reminders
 
 
 # Base.metadata.create_all(bind=engine)
@@ -20,10 +22,13 @@ from fastapi.staticfiles import StaticFiles
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup
     await build_static_audio_cache()
+    start_scheduler()
+    await reconcile_pending_wait_reminders()
     yield
-    # shutdown (nothing to do yet, but this is where cleanup would go)
+    stop_scheduler()
+
+app = FastAPI(lifespan=lifespan)
 
 
 app = FastAPI(title="Reception Robot Backend", lifespan=lifespan)
@@ -39,6 +44,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 app.mount("/employee_photos", StaticFiles(directory="employee_photos"), name="employee_photos")
 app.mount("/visitor_photos", StaticFiles(directory="visitor_photos"), name="visitor_photos")
