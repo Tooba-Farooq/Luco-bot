@@ -142,9 +142,6 @@ public class DeviceCheck : MonoBehaviour
     {
         if (camTexture != null && camTexture.isPlaying)
             camTexture.Stop();
-
-        if (!string.IsNullOrEmpty(micDevice) && Microphone.IsRecording(micDevice))
-            Microphone.End(micDevice);
     }
 
     private void OnDestroy()

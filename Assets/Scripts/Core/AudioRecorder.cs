@@ -23,6 +23,10 @@ public class AudioRecorder : MonoBehaviour
     [Tooltip("How many consecutive loud windows are needed before we commit to 'speech started'. Filters out single spikes.")]
     public int speechStartDebounceWindows = 2;
 
+    [Header("Post-Recording Sanity Check")]
+    [Tooltip("Minimum total time (seconds) actually spent above threshold for a recording to count as real speech, not a stray noise trigger. Prevents near-silent/noise clips from being sent to the transcription API, where they tend to cause hallucinated text.")]
+    public float minTotalLoudDuration = 0.5f;
+
     [Header("Initial Calibration")]
     public float calibrationDuration = 0.6f;
 
@@ -45,20 +49,25 @@ public class AudioRecorder : MonoBehaviour
     public float CurrentVolume { get; private set; }
     public float CurrentThreshold { get; private set; }
 
+    // Exposed so callers (e.g. SessionManager) can check if a prime is ready.
+    public bool IsPrimed { get; private set; } = false;
+
     private float[] volumeHistoryBuffer;
     private int volumeHistoryIndex;
     private string micDevice;
     private AudioClip recordingClip;
     private bool isRecording = false;
     private Coroutine activeRecordCoroutine;
+    private Coroutine primeCoroutine;
     private Action<byte[]> activeOnComplete;
+    private float primedThreshold;
 
     private readonly List<float> rollingQuietSamples = new List<float>();
 
     // Zero-alloc cached buffers
     private float[] medianSortBuffer;
     private WaitForSeconds cachedPollWait;
-    
+
     // Cached WAV header ASCII bytes
     private static readonly byte[] RIFF = new byte[] { (byte)'R', (byte)'I', (byte)'F', (byte)'F' };
     private static readonly byte[] WAVE = new byte[] { (byte)'W', (byte)'A', (byte)'V', (byte)'E' };
@@ -108,6 +117,103 @@ public class AudioRecorder : MonoBehaviour
         Debug.Log($"[AudioRecorder] Active Microphone Device: '{micDevice}'");
     }
 
+    // =========================================================
+    // PRIMING (mic-on + silent calibration, done ahead of time
+    // so the visitor isn't talking into a mic that's still
+    // measuring "silence")
+    // =========================================================
+
+    public void PrimeMicrophone()
+    {
+        if (isRecording)
+        {
+            // Already actively recording, nothing to prime.
+            return;
+        }
+
+        if (primeCoroutine != null)
+        {
+            // Already priming.
+            return;
+        }
+
+        if (string.IsNullOrEmpty(micDevice))
+        {
+            SelectMicrophoneDevice();
+            if (string.IsNullOrEmpty(micDevice))
+            {
+                Debug.LogWarning("[AudioRecorder] Cannot prime: No microphone device available.");
+                return;
+            }
+        }
+
+        // If a stale primed clip exists from a previous cycle, clear it out first.
+        if (IsPrimed && recordingClip != null)
+        {
+            if (!string.IsNullOrEmpty(micDevice) && Microphone.IsRecording(micDevice))
+                Microphone.End(micDevice);
+
+            Destroy(recordingClip);
+            recordingClip = null;
+        }
+
+        IsPrimed = false;
+        primeCoroutine = StartCoroutine(PrimeRoutine());
+    }
+
+    private IEnumerator PrimeRoutine()
+    {
+        volumeHistoryBuffer = new float[volumeHistorySize];
+        volumeHistoryIndex = 0;
+        CurrentVolume = 0f;
+        rollingQuietSamples.Clear();
+
+        int maxBufferLengthSec = Mathf.CeilToInt(maxRecordingLength) + 5;
+
+        // Loop set to TRUE to prevent headPos locking at buffer end
+        recordingClip = Microphone.Start(micDevice, true, maxBufferLengthSec, sampleRate);
+
+        while (Microphone.GetPosition(micDevice) <= 0)
+            yield return null;
+
+        int windowSize = Mathf.RoundToInt(sampleRate * POLL_INTERVAL);
+        float[] sampleWindow = new float[windowSize];
+
+        int calibrationSteps = Mathf.Max(1, Mathf.RoundToInt(calibrationDuration / POLL_INTERVAL));
+        var calibSamples = new List<float>(calibrationSteps);
+
+        for (int i = 0; i < calibrationSteps; i++)
+        {
+            yield return cachedPollWait;
+            if (TryGetSampleWindow(sampleWindow))
+            {
+                float v = 0f;
+                for (int s = 0; s < sampleWindow.Length; s++) v += Mathf.Abs(sampleWindow[s]);
+                v /= sampleWindow.Length;
+                calibSamples.Add(v);
+            }
+        }
+
+        if (calibSamples.Count == 0) calibSamples.Add(minAbsoluteThreshold);
+
+        float initialNoiseFloor = CalculateMedianZeroAlloc(calibSamples);
+        rollingQuietSamples.AddRange(calibSamples);
+        primedThreshold = ComputeThresholdFromNoiseFloor(initialNoiseFloor);
+        CurrentThreshold = primedThreshold;
+
+        if (logVolumeForCalibration)
+        {
+            Debug.Log($"[AudioRecorder] (PRIME) noise floor (median)={initialNoiseFloor:F5} Threshold={primedThreshold:F5}");
+        }
+
+        IsPrimed = true;
+        primeCoroutine = null;
+    }
+
+    // =========================================================
+    // RECORDING ENTRY POINTS
+    // =========================================================
+
     public void StartRecording(Action<byte[]> onComplete)
     {
         if (string.IsNullOrEmpty(micDevice))
@@ -128,7 +234,43 @@ public class AudioRecorder : MonoBehaviour
         }
 
         activeOnComplete = onComplete;
-        activeRecordCoroutine = StartCoroutine(RecordRoutine(onComplete));
+
+        if (IsPrimed && recordingClip != null && Microphone.IsRecording(micDevice))
+        {
+            // Fast path: mic is already on and calibrated on silence.
+            // Jump straight into the active listening loop.
+            float threshold = primedThreshold;
+            IsPrimed = false; // consumed
+            activeRecordCoroutine = StartCoroutine(ListenRoutine(onComplete, threshold));
+        }
+        else
+        {
+            // Fallback: no prime available (e.g. called directly without
+            // PrimeMicrophone, or priming was cancelled). Do the old
+            // combined start+calibrate+listen flow.
+            if (primeCoroutine != null)
+            {
+                StopCoroutine(primeCoroutine);
+                primeCoroutine = null;
+            }
+
+            // If priming left a mic session / clip half-initialized, tear it
+            // down before starting a fresh one, otherwise the old AudioClip
+            // leaks (Microphone.Start below would silently overwrite the
+            // reference without ever Destroy()-ing it).
+            if (!string.IsNullOrEmpty(micDevice) && Microphone.IsRecording(micDevice))
+            {
+                Microphone.End(micDevice);
+            }
+            if (recordingClip != null)
+            {
+                Destroy(recordingClip);
+                recordingClip = null;
+            }
+            IsPrimed = false;
+
+            activeRecordCoroutine = StartCoroutine(RecordRoutine(onComplete));
+        }
     }
 
     public void StopRecording()
@@ -144,6 +286,12 @@ public class AudioRecorder : MonoBehaviour
             activeRecordCoroutine = null;
         }
 
+        if (primeCoroutine != null)
+        {
+            StopCoroutine(primeCoroutine);
+            primeCoroutine = null;
+        }
+
         if (!string.IsNullOrEmpty(micDevice) && Microphone.IsRecording(micDevice))
         {
             Microphone.End(micDevice);
@@ -156,6 +304,7 @@ public class AudioRecorder : MonoBehaviour
         }
 
         isRecording = false;
+        IsPrimed = false;
 
         if (invokeCallback)
         {
@@ -210,30 +359,33 @@ public class AudioRecorder : MonoBehaviour
     }
 
     private bool TryGetSampleWindow(float[] outputBuffer, int safetyMargin = 256)
-{
-    if (recordingClip == null || string.IsNullOrEmpty(micDevice)) return false;
+    {
+        if (recordingClip == null || string.IsNullOrEmpty(micDevice)) return false;
 
-    int headPos = Microphone.GetPosition(micDevice);
-    int windowSize = outputBuffer.Length;
+        int headPos = Microphone.GetPosition(micDevice);
+        int windowSize = outputBuffer.Length;
 
-    if (headPos < 0) return false;
+        if (headPos < 0) return false;
 
-    int readStart = headPos - windowSize - safetyMargin;
+        int readStart = headPos - windowSize - safetyMargin;
 
-    // Recording sessions are always shorter than the mic's ring buffer
-    // (maxRecordingLength + 5s), so the buffer never actually wraps mid-session.
-    // A negative readStart just means we don't have enough audio yet
-    // (the very start of recording) — skip this window instead of reading
-    // stale/unwritten data from the tail of the buffer.
-    if (readStart < 0) return false;
+        // Recording sessions are always shorter than the mic's ring buffer
+        // (maxRecordingLength + 5s), so the buffer never actually wraps mid-session.
+        // A negative readStart just means we don't have enough audio yet
+        // (the very start of recording) — skip this window instead of reading
+        // stale/unwritten data from the tail of the buffer.
+        if (readStart < 0) return false;
 
-    if (readStart + windowSize > recordingClip.samples) return false;
+        if (readStart + windowSize > recordingClip.samples) return false;
 
-    recordingClip.GetData(outputBuffer, readStart);
-    return true;
-}
+        recordingClip.GetData(outputBuffer, readStart);
+        return true;
+    }
 
-    // ---- Main Routine ----
+    // =========================================================
+    // FALLBACK: combined start + calibrate + listen (used only
+    // if StartRecording is called without a prior successful prime)
+    // =========================================================
 
     private IEnumerator RecordRoutine(Action<byte[]> onComplete)
     {
@@ -245,7 +397,7 @@ public class AudioRecorder : MonoBehaviour
         rollingQuietSamples.Clear();
 
         int maxBufferLengthSec = Mathf.CeilToInt(maxRecordingLength) + 5;
-        
+
         // Loop set to TRUE to prevent headPos locking at buffer end
         recordingClip = Microphone.Start(micDevice, true, maxBufferLengthSec, sampleRate);
 
@@ -283,11 +435,41 @@ public class AudioRecorder : MonoBehaviour
             Debug.Log($"[AudioRecorder] Initial noise floor (median)={initialNoiseFloor:F5} Threshold={effectiveThreshold:F5}");
         }
 
-        // --- Recording Loop ---
-        float elapsed = calibrationDuration;
+        yield return ListenLoop(onComplete, effectiveThreshold, calibrationDuration);
+    }
+
+    // =========================================================
+    // FAST PATH: mic already on + calibrated, just start listening
+    // =========================================================
+
+    private IEnumerator ListenRoutine(Action<byte[]> onComplete, float threshold)
+    {
+        isRecording = true;
+        CurrentThreshold = threshold;
+
+        if (logVolumeForCalibration)
+        {
+            Debug.Log($"[AudioRecorder] Using primed threshold={threshold:F5}, listening immediately.");
+        }
+
+        yield return ListenLoop(onComplete, threshold, 0f);
+    }
+
+    // =========================================================
+    // SHARED: active "listen for speech" loop
+    // =========================================================
+
+    private IEnumerator ListenLoop(Action<byte[]> onComplete, float startingThreshold, float startingElapsed)
+    {
+        int windowSize = Mathf.RoundToInt(sampleRate * POLL_INTERVAL);
+        float[] sampleWindow = new float[windowSize];
+
+        float effectiveThreshold = startingThreshold;
+        float elapsed = startingElapsed;
         float silenceTimer = 0f;
         bool speechDetected = false;
         int consecutiveLoudWindows = 0;
+        float totalLoudTime = 0f;
 
         while (elapsed < maxRecordingLength)
         {
@@ -310,6 +492,7 @@ public class AudioRecorder : MonoBehaviour
                 {
                     consecutiveLoudWindows++;
                     silenceTimer = 0f;
+                    totalLoudTime += POLL_INTERVAL;
 
                     if (consecutiveLoudWindows >= speechStartDebounceWindows)
                         speechDetected = true;
@@ -336,7 +519,7 @@ public class AudioRecorder : MonoBehaviour
 
                 if (logVolumeForCalibration)
                 {
-                    Debug.Log($"[AudioRecorder] vol={volume:F5} thresh={effectiveThreshold:F5} speech={speechDetected} silence={silenceTimer:F2}");
+                    Debug.Log($"[AudioRecorder] vol={volume:F5} thresh={effectiveThreshold:F5} speech={speechDetected} silence={silenceTimer:F2} loudTotal={totalLoudTime:F2}");
                 }
             }
         }
@@ -349,9 +532,13 @@ public class AudioRecorder : MonoBehaviour
         int totalMaxSamples = Mathf.CeilToInt(maxRecordingLength) * sampleRate;
         int recordedSampleCount = Mathf.Min(finalPos > 0 ? finalPos : totalMaxSamples, totalMaxSamples);
 
-        if (recordedSampleCount <= 0 || !speechDetected)
+        if (recordedSampleCount <= 0 || !speechDetected || totalLoudTime < minTotalLoudDuration)
         {
-            if (!speechDetected && recordedSampleCount > 0)
+            if (speechDetected && totalLoudTime < minTotalLoudDuration)
+            {
+                Debug.Log($"[AudioRecorder] Speech briefly detected but total loud time too low ({totalLoudTime:F2}s < {minTotalLoudDuration:F2}s) — treating as noise, discarding.");
+            }
+            else if (!speechDetected && recordedSampleCount > 0)
             {
                 Debug.Log("[AudioRecorder] No speech detected above threshold — discarding clip.");
             }
@@ -376,7 +563,7 @@ public class AudioRecorder : MonoBehaviour
         NormalizeGain(finalSamples);
 
         byte[] wavBytes = EncodeToWavZeroAlloc(finalSamples, sampleRate, 1);
-        
+
         activeOnComplete = null;
         onComplete?.Invoke(wavBytes);
     }
@@ -411,13 +598,13 @@ public class AudioRecorder : MonoBehaviour
         WriteInt(wav, 4, 36 + dataSize);
         Buffer.BlockCopy(WAVE, 0, wav, 8, 4);
         Buffer.BlockCopy(FMT, 0, wav, 12, 4);
-        WriteInt(wav, 16, 16); 
-        WriteShort(wav, 20, 1); 
+        WriteInt(wav, 16, 16);
+        WriteShort(wav, 20, 1);
         WriteShort(wav, 22, (short)channels);
         WriteInt(wav, 24, sampleRate);
-        WriteInt(wav, 28, sampleRate * channels * 2); 
-        WriteShort(wav, 32, (short)(channels * 2)); 
-        WriteShort(wav, 34, 16); 
+        WriteInt(wav, 28, sampleRate * channels * 2);
+        WriteShort(wav, 32, (short)(channels * 2));
+        WriteShort(wav, 34, 16);
         Buffer.BlockCopy(DATA, 0, wav, 36, 4);
         WriteInt(wav, 40, dataSize);
 

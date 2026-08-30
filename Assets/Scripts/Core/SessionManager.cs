@@ -103,33 +103,47 @@ public class SessionManager : MonoBehaviour
     }
 
     private IEnumerator RecordAndSendRoutine()
-{
-    yield return new WaitForSeconds(preListenBuffer);
-
-    if (!string.IsNullOrEmpty(speakNowText))
     {
-        OnRobotSpeaking?.Invoke(speakNowText, speakNowDisplayDuration);
-        yield return new WaitForSeconds(speakNowDisplayDuration);
-    }
+        // Start the mic + run silent-noise-floor calibration RIGHT NOW,
+        // while the visitor is still reading the prompt / reacting to it.
+        // This avoids calibrating on top of the visitor's first words,
+        // which was pinning the speech threshold too high and causing
+        // "no speech detected" -> retry -> give up -> back to idle/detect.
+        if (AudioRecorder.Instance != null)
+        {
+            AudioRecorder.Instance.PrimeMicrophone();
+        }
+        else
+        {
+            Debug.LogError("[SessionManager] AudioRecorder.Instance is NULL.");
+        }
 
-    listeningIndicatorActive = true;
+        yield return new WaitForSeconds(preListenBuffer);
 
-    if (cueAudioSource != null && readyToSpeakChime != null)
-    {
-        cueAudioSource.PlayOneShot(readyToSpeakChime);
-    }
+        if (!string.IsNullOrEmpty(speakNowText))
+        {
+            OnRobotSpeaking?.Invoke(speakNowText, speakNowDisplayDuration);
+            yield return new WaitForSeconds(speakNowDisplayDuration);
+        }
 
-    OnReadyToSpeak?.Invoke();
+        listeningIndicatorActive = true;
 
-    if (AudioRecorder.Instance != null)
-    {
-        AudioRecorder.Instance.StartRecording(OnAudioRecorded);
+        if (cueAudioSource != null && readyToSpeakChime != null)
+        {
+            cueAudioSource.PlayOneShot(readyToSpeakChime);
+        }
+
+        OnReadyToSpeak?.Invoke();
+
+        if (AudioRecorder.Instance != null)
+        {
+            AudioRecorder.Instance.StartRecording(OnAudioRecorded);
+        }
+        else
+        {
+            Debug.LogError("[SessionManager] AudioRecorder.Instance is NULL.");
+        }
     }
-    else
-    {
-        Debug.LogError("[SessionManager] AudioRecorder.Instance is NULL.");
-    }
-}
 
     private void OnAudioRecorded(byte[] wavBytes)
     {
