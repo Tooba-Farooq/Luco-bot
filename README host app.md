@@ -303,7 +303,6 @@ Current value is also returned by `GET /auth/me` (see above) — no separate GET
 ## Not built yet
 
 - Password reset flow
-- Admin UI for creating employees (internal tool, separate from both deliverables above)
 
 ---
 
@@ -378,3 +377,70 @@ Errors: `404` if `status_token` doesn't match any session.
 | 404 on `/message`                | `status_token` doesn't match any session                                                |
 
 ---
+
+## Deliverable 4: Admin dashboard authentication
+
+**Single admin, no signup.** There's exactly one admin account, credentials set on the backend side — no registration flow needed on your end.
+
+### Login
+
+```
+POST /auth/admin-login
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&username=<admin_username>&password=<admin_password>
+```
+
+Form-encoded (OAuth2 convention), same as employee login — not JSON.
+
+Response:
+
+```json
+{ "access_token": "<jwt>", "token_type": "bearer" }
+```
+
+- No refresh token for admin — just the one access token.
+- Token expires in 8 hours. On expiry, just show the login form again — no refresh flow to implement.
+- Store the token however you're already storing state in the dashboard (memory/localStorage — your call).
+
+### Using the token
+
+Attach it to every request to the two protected endpoints below:
+
+```
+Authorization: Bearer <access_token>
+```
+
+### Protected endpoints
+
+```
+GET /employees
+Authorization: Bearer <access_token>
+```
+
+Returns the employee list — same shape you're already using in the dashboard.
+
+```
+POST /employees
+Authorization: Bearer <access_token>
+Content-Type: multipart/form-data
+
+name=<string>
+floor_room=<string, optional>
+phone_number=<string, optional>
+email=<string, optional>
+photo=<file>
+```
+
+Creates an employee — same as before, just now requires the header.
+
+### What changes on your side
+
+Replace whatever hardcoded/fake login check the dashboard currently does with an actual call to `/auth/admin-login`. On success, store the returned token and attach it as a `Bearer` header on the `/employees` GET and POST calls. If either of those calls comes back `401`, treat it as "not logged in" and route back to the login screen.
+
+### Errors to handle (admin-specific)
+
+| Status                            | Meaning                                                       |
+| --------------------------------- | ------------------------------------------------------------- |
+| 401 on `/auth/admin-login`        | Wrong admin username or password                              |
+| 401 on `/employees` (GET or POST) | Missing, invalid, or expired admin token → send back to login |

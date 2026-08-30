@@ -264,6 +264,7 @@ There's no separate knowledge-base database table — office info is inlined dir
 **Content-Type:** `multipart/form-data`
 
 Registers a new employee and stores their profile details for admin/host-directory use. This is an admin-facing endpoint (not called by Unity) — **live tablet recognition does not use employee records anymore**; the `/detect` flow matches against stored visitors only.
+⚠️ Now requires admin authentication. Send Authorization: Bearer <admin_access_token> on this request — obtained via POST /auth/admin-login. Full auth flow documented in the host app README, Deliverable 4 (Admin dashboard authentication), since that's where the admin dashboard integration lives, not Unity.
 
 ### Request fields
 
