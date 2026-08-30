@@ -171,10 +171,16 @@ export async function getHostMessages() {
   return response.json();
 }
 
-export async function respondToAlert(sessionId, response, waitMinutes) {
+// availableAgainAt (optional) is an ISO datetime string, only meaningful
+// when response === 'not_available'. Omit it to send the visitor a
+// generic "come back another time" message instead.
+export async function respondToAlert(sessionId, response, waitMinutes, availableAgainAt) {
   const body = { session_id: sessionId, response };
   if (response === 'wait') {
     body.wait_minutes = waitMinutes;
+  }
+  if (response === 'not_available' && availableAgainAt) {
+    body.available_again_at = availableAgainAt;
   }
 
   const res = await authFetch(`${BASE_URL}/host/respond`, {

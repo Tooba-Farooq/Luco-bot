@@ -100,7 +100,7 @@ export default function Login({ goToHome }) {
         // Register device right after login, per spec.
         const pushToken = await getPushToken();
 await registerDevice(pushToken, Platform.OS);
-        goToHome();
+        goToHome(true);
     } catch (error) {
         Alert.alert('Login Failed', error.message || 'Invalid credentials');
         console.error('Login error:', error);

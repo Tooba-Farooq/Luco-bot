@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import SplashScreen from './app/Splash-screen/splash_screen';
 import Home from './app/home-screen/home';
 import Login from './app/login/login';
-import AlertScreen from './app/alert-screen/alert';
 import MessagesScreen from './app/messages-screen/message';
 import MessageThreadScreen from './app/messages-screen/message-thread';
 import HistoryScreen from './app/history-screen/history';
@@ -30,7 +29,7 @@ const TABS = [
 ];
 
 // Screens that own the whole viewport, no tab bar underneath them
-const NO_TAB_BAR_SCREENS = ['splash', 'login', 'alerts', 'messageThread'];
+const NO_TAB_BAR_SCREENS = ['splash', 'login', 'messageThread'];
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('splash');
@@ -91,12 +90,15 @@ export default function App() {
       refreshPendingAlerts();
     });
 
+    // Alerts now live on Home (no separate full-screen alert view), so a
+    // tapped notification just routes the host to Home, where the relevant
+    // card is right at the top of the pending list.
     responseListener.current = Notifications.addNotificationResponseReceivedListener(async (response) => {
       const data = response.notification.request.content.data;
       console.log('Notification tapped:', data);
       if (data?.session_id) {
         await refreshPendingAlerts();
-        setCurrentScreen('alerts');
+        setCurrentScreen('home');
       }
     });
 
@@ -126,11 +128,6 @@ export default function App() {
     setCurrentScreen('home');
     refreshPendingAlerts();
   }, [refreshPendingAlerts]);
-
-  const goToAlerts = useCallback((alerts) => {
-    if (alerts) setPendingAlerts(alerts);
-    setCurrentScreen('alerts');
-  }, []);
 
   const goToMessages = useCallback(() => setCurrentScreen('messages'), []);
 
@@ -170,7 +167,6 @@ export default function App() {
           <Home
             key={refreshKey}
             goToLogin={logout}
-            goToAlerts={goToAlerts}
             goToMessages={goToMessages}
             pending={pendingAlerts}
             onAlertResolved={handleAlertResolved}
@@ -190,15 +186,6 @@ export default function App() {
         return <HistoryScreen />;
       case 'account':
         return <AccountScreen goToLogin={logout} />;
-      case 'alerts':
-        return (
-          <AlertScreen
-            alerts={pendingAlerts}
-            onResolved={handleAlertResolved}
-            goToHome={() => setCurrentScreen('home')}
-            goToMessages={goToMessages}
-          />
-        );
       default:
         return <Login goToHome={goToHome} />;
     }
