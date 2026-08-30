@@ -39,6 +39,12 @@ def create_refresh_token(employee_id: int) -> str:
         timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
     )
 
+def create_admin_token() -> str:
+    return _create_token(
+        {"sub": "admin", "type": "admin"},
+        timedelta(hours=8),  # re-login required daily; adjust if you want it longer
+    )
+
 
 def decode_token(token: str) -> dict:
     try:

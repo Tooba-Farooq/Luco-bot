@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models import EmployeeCreateResponse
 from app.services.employee_service import create_employee_record
 from app.services.email_service import send_invite_email
+from app.dependencies import get_current_admin
 
 router = APIRouter()
 
@@ -22,7 +23,7 @@ def _to_employee_response(employee: Employee) -> EmployeeCreateResponse:
     )
 
 @router.get("/employees", response_model=list[EmployeeCreateResponse])
-async def list_employees(db: Session = Depends(get_db)):
+async def list_employees(db: Session = Depends(get_db), _: bool = Depends(get_current_admin)):
     employees = db.query(Employee).order_by(Employee.id.desc()).all()
     return [_to_employee_response(employee) for employee in employees]
 
@@ -35,7 +36,8 @@ async def create_employee(
     phone_number: str = Form(None),
     email: str = Form(None),
     photo: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(get_current_admin),   # add this
 ):
     photo_bytes = await photo.read()
 

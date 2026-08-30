@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
+import os
 
 from app.database import get_db
 from app.models_db import Employee
@@ -17,10 +18,14 @@ from app.services.auth_service import (
     hash_password,
     create_access_token,
     create_refresh_token,
+    create_admin_token,
     decode_token,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
+ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH")
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -95,6 +100,14 @@ def device_status(current_employee: Employee = Depends(get_current_employee)):
         "platform": current_employee.device_platform,
     }
 
+@router.post("/admin-login")
+def admin_login(form_data: OAuth2PasswordRequestForm = Depends()):
+    if form_data.username != ADMIN_USERNAME or not verify_password(
+        form_data.password, ADMIN_PASSWORD_HASH
+    ):
+        raise HTTPException(status_code=401, detail="Incorrect admin credentials")
+
+    return {"access_token": create_admin_token(), "token_type": "bearer"}
 
 @router.get("/me")
 def me(request: Request, current_employee: Employee = Depends(get_current_employee)):

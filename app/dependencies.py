@@ -5,8 +5,8 @@ from app.database import get_db
 from app.models_db import Employee
 from app.services.auth_service import decode_token
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", scheme_name="EmployeeAuth")
+admin_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/admin-login", scheme_name="AdminAuth")
 
 def get_current_employee(
     token: str = Depends(oauth2_scheme),
@@ -29,3 +29,15 @@ def get_current_employee(
             detail="Employee not found or inactive",
         )
     return employee
+
+def get_current_admin(token: str = Depends(admin_oauth2_scheme)) -> bool:
+    try:
+        payload = decode_token(token)
+        if payload.get("type") != "admin":
+            raise ValueError("Wrong token type")
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired or invalid — please log in again",
+        )
+    return True
