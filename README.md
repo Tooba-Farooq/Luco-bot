@@ -1,5 +1,10 @@
 # Lucobot Backend — Technology Stack
 
+## API Documentation
+- [API Documentation for Unity Tablet Robot](https://github.com/Tooba-Farooq/Luco-bot/blob/backend/README.md)
+- [API Documentation for Flutter Employee App](https://github.com/Tooba-Farooq/Luco-bot/blob/backend/README%20host%20app.md)
+---
+
 ## FastAPI
 Selected as the backend framework due to the large number of interdependent components in the system. FastAPI's asynchronous support and reduced boilerplate allowed for faster development without compromising structure.
 
