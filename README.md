@@ -5,6 +5,10 @@
 - [API Documentation for Flutter Employee App](https://github.com/Tooba-Farooq/Luco-bot/blob/backend/README%20host%20app.md)
 ---
 
+## Admin dashboard credentials
+username: LucoBotAdminMisbah
+Password: your_chosen_password
+
 ## FastAPI
 Selected as the backend framework due to the large number of interdependent components in the system. FastAPI's asynchronous support and reduced boilerplate allowed for faster development without compromising structure.
 
